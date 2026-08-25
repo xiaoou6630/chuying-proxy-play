@@ -25,10 +25,10 @@ import java.util.stream.Stream;
  * ├── shared/                     # 三平台通用资源（只打包一份，运行时复制到平台目录）
  * │   ├── pikafish.nnue
  * │   └── rapfi/                  # config + 模型（Rapfi 要求与 exe 同目录，解压时复制过去）
- * └── windows|linux|macos/        # 当前平台的可执行文件
- *     ├── pikafish[.exe]
- *     ├── stockfish[.exe]
- *     └── rapfi/pbrain-rapfi[.exe]
+ * └── windows|linux|macos/        # 当前平台的可执行文件（统一无扩展名！）
+ *     ├── pikafish                # CurseForge 禁止 jar 内含 .exe/.sh/.bat，
+ *     ├── stockfish               # 故 jar 内一律不带后缀，
+ *     └── rapfi/pbrain-rapfi      # Windows 下解压时再补回 .exe
  * </pre>
  * <p>
  * 解压规则：文件不存在才解压（已存在说明用户可能自行替换过，尊重用户文件）。
@@ -99,20 +99,19 @@ public final class EngineExtractor {
         Path platDir = dir.resolve(platform());
 
         // 传入各自目录前缀，去掉后才 resolve 到对应目录，避免 engines/shared/shared 双重目录
-        extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/");
-        extractResources(platformResources(), platDir, "engines/" + platform() + "/");
+        extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/", false);
+        extractResources(platformResources(), platDir, "engines/" + platform() + "/", true);
         copySharedToPlatform(sharedDir, platDir);
         makeExecutable(platDir);
     }
 
-    /** 当前平台的资源清单 */
+    /** 当前平台的资源清单（jar 内统一无 .exe 后缀，Windows 下解压时补回） */
     private static List<String> platformResources() {
         String plat = platform();
-        String ext = isWindows() ? ".exe" : "";
         return List.of(
-                "engines/" + plat + "/pikafish" + ext,
-                "engines/" + plat + "/stockfish" + ext,
-                "engines/" + plat + "/rapfi/pbrain-rapfi" + ext
+                "engines/" + plat + "/pikafish",
+                "engines/" + plat + "/stockfish",
+                "engines/" + plat + "/rapfi/pbrain-rapfi"
         );
     }
 
@@ -120,11 +119,16 @@ public final class EngineExtractor {
      * 解压资源到目标目录。
      * {@code prefix} 是 jar 内资源的前缀（含 engines/ 与平台/shared 段），
      * 剥离后剩余的相对路径再 resolve 到 {@code targetRoot}。
+     * {@code appendExeOnWindows} 为 true 时，Windows 下解压文件名补回 .exe 后缀
+     * （jar 内禁止含可执行文件，见 build.gradle 的 rename）。
      */
-    private static void extractResources(List<String> resources, Path targetRoot, String prefix) {
+    private static void extractResources(List<String> resources, Path targetRoot, String prefix, boolean appendExeOnWindows) {
         for (String res : resources) {
             String rel = res.substring(prefix.length());
             Path target = targetRoot.resolve(rel.replace('/', java.io.File.separatorChar));
+            if (appendExeOnWindows && isWindows()) {
+                target = target.resolveSibling(target.getFileName() + ".exe");
+            }
             if (Files.exists(target)) {
                 continue;
             }

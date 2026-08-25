@@ -1,0 +1,24 @@
+{
+  "chuying.configuration.title": "褚嬴代打 設定",
+  "chuying.configuration.section.chuying.client.toml": "褚嬴代打",
+  "chuying.configuration.section.chuying.client.toml.title": "褚嬴代打",
+  "chuying.configuration.enabled": "代打機能を有効化",
+  "chuying.configuration.cchessEnginePath": "中国将棋エンジンのパス（Pikafish 等の UCI エンジン）",
+  "chuying.configuration.wchessEnginePath": "チェスエンジンのパス（Stockfish 等の UCI エンジン）",
+  "chuying.configuration.gomokuEnginePath": "五目並べエンジンのパス（Rapfi 等の pbrain エンジン）",
+  "chuying.configuration.thinkTime": "1手あたりの思考時間（ミリ秒）",
+  "chuying.configuration.strength": "思考強度",
+  "chuying.configuration.strength.LOW": "低",
+  "chuying.configuration.strength.DEFAULT": "標準",
+  "chuying.configuration.strength.HIGH": "高",
+  "chuying.configuration.strength.MAX": "極限",
+  "chuying.configuration.debugForceMaxMaid": "デバッグ：五目並べのメイドを最高難易度 HELL に強制",
+
+  "key.category.chuying": "褚嬴代打",
+  "key.chuying.proxy_play": "代打の切り替え",
+  "hud.chuying.proxy_on": "褚嬴代打：ON",
+  "hud.chuying.proxy_off": "褚嬴代打：OFF",
+  "message.chuying.no_cchess_engine": "褚嬴代打：中国将棋エンジンが未設定（cchessEnginePath）",
+  "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンが未設定（wchessEnginePath）",
+  "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンが未設定（gomokuEnginePath）"
+}

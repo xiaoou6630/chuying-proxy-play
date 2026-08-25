@@ -15,7 +15,7 @@ import org.lwjgl.glfw.GLFW;
  * 快捷键与 HUD 注册（仅客户端）。
  */
 public class ProxyPlayKey {
-    /** 默认键位 K：切换褚赢代打 */
+    /** 默认键位 K：切换褚嬴代打 */
     public static final KeyMapping PROXY_KEY = new KeyMapping(
             "key.chuying.proxy_play",
             KeyConflictContext.IN_GAME,

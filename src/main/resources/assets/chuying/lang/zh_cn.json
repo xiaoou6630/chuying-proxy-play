@@ -1,9 +1,7 @@
 {
-  "mods.toml.description.chuying": "褚赢代打 (Chuying Proxy Play)：为 Touhou Little Maid 的棋类（五子棋/中国象棋/国际象棋）接入外部强引擎自动落子。\n想体验真正的\u201c老叟戏顽童\u201d？切到极致档，让皮卡鱼/Stockfish/Rapfi 替你下棋，几乎不丢子。\n\n用法：K 键切换开关；设置→控制→按键绑定 可改键；设置→模组→褚赢代打 可调思考时间与强度。",
-
-  "chuying.configuration.title": "褚赢代打 配置",
-  "chuying.configuration.section.chuying.client.toml": "褚赢代打",
-  "chuying.configuration.section.chuying.client.toml.title": "褚赢代打",
+  "chuying.configuration.title": "褚嬴代打 配置",
+  "chuying.configuration.section.chuying.client.toml": "褚嬴代打",
+  "chuying.configuration.section.chuying.client.toml.title": "褚嬴代打",
   "chuying.configuration.enabled": "启用代打功能",
   "chuying.configuration.cchessEnginePath": "中国象棋引擎路径（皮卡鱼等 UCI 引擎）",
   "chuying.configuration.wchessEnginePath": "国际象棋引擎路径（Stockfish 等 UCI 引擎）",
@@ -14,12 +12,13 @@
   "chuying.configuration.strength.DEFAULT": "默认",
   "chuying.configuration.strength.HIGH": "高",
   "chuying.configuration.strength.MAX": "极致",
+  "chuying.configuration.debugForceMaxMaid": "调试：强制五子棋女仆最高难度 HELL",
 
-  "key.category.chuying": "褚赢代打",
+  "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "切换代打开关",
-  "hud.chuying.proxy_on": "褚赢代打：已开启",
-  "hud.chuying.proxy_off": "褚赢代打：已关闭",
-  "message.chuying.no_cchess_engine": "褚赢代打：未配置中国象棋引擎（cchessEnginePath）",
-  "message.chuying.no_wchess_engine": "褚赢代打：未配置国际象棋引擎（wchessEnginePath）",
-  "message.chuying.no_gomoku_engine": "褚赢代打：未配置五子棋引擎（gomokuEnginePath）"
+  "hud.chuying.proxy_on": "褚嬴代打：已开启",
+  "hud.chuying.proxy_off": "褚嬴代打：已关闭",
+  "message.chuying.no_cchess_engine": "褚嬴代打：未配置中国象棋引擎（cchessEnginePath）",
+  "message.chuying.no_wchess_engine": "褚嬴代打：未配置国际象棋引擎（wchessEnginePath）",
+  "message.chuying.no_gomoku_engine": "褚嬴代打：未配置五子棋引擎（gomokuEnginePath）"
 }

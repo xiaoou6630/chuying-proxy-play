@@ -5,11 +5,9 @@ import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
 import com.chuying.engine.PbrainGomokuEngine;
 import com.chuying.engine.UciEngine;
-import com.chuying.network.CChessProxyMovePayload;
-import com.chuying.network.GomokuProxyMovePayload;
-import com.chuying.network.WChessProxyMovePayload;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Point;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Statue;
+import com.github.tartaricacid.touhoulittlemaid.api.game.xqwlight.Position;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockCChess;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockGomoku;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockWChess;
@@ -20,6 +18,7 @@ import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityWChess;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.Block;
@@ -31,22 +30,38 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayDeque;
 import java.util.concurrent.CompletableFuture;
 
 /**
  * 客户端代打核心（纯客户端）：
  * <ul>
  *   <li>快捷键 K 切换开关</li>
- *   <li>每 tick 检测准星对准的棋盘，轮到玩家且局面变化时，用外挂引擎算招并发给服务端</li>
+ *   <li>每 tick 检测准星对准的棋盘，轮到玩家且局面变化时，用外挂引擎算招，
+ *       再模拟玩家右键棋盘交叉点落子（走 TLM 原版交互，服务器无需安装本 mod）</li>
  * </ul>
  */
 @EventBusSubscriber(value = Dist.CLIENT)
 public class ProxyPlayClient {
     /** 引擎走法被拒绝等导致局面卡住时，超过该时间重新允许走当前局面 */
     private static final long STUCK_TIMEOUT_MS = 10_000;
+
+    /** 待执行的模拟点击（象棋需要"选子→落子"两步，间隔数 tick） */
+    private static final ArrayDeque<PendingClick> PENDING_CLICKS = new ArrayDeque<>();
+    /** 象棋两步点击的间隔 tick */
+    private static final int CHESS_STEP_DELAY_TICKS = 2;
+
+    private static final class PendingClick {
+        final BlockHitResult hit;
+        int delayTicks;
+
+        PendingClick(BlockHitResult hit, int delayTicks) {
+            this.hit = hit;
+            this.delayTicks = delayTicks;
+        }
+    }
 
     @SubscribeEvent
     public static void onKey(InputEvent.Key event) {
@@ -56,6 +71,7 @@ public class ProxyPlayClient {
             if (!ProxyPlayState.enabled) {
                 ProxyPlayState.lastFen = "";
                 ProxyPlayState.lastSentAt = 0;
+                PENDING_CLICKS.clear();
             }
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
@@ -67,6 +83,9 @@ public class ProxyPlayClient {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        // 优先执行排队的模拟点击（象棋两步间隔）
+        processPendingClicks();
+
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) {
             return;
@@ -88,30 +107,51 @@ public class ProxyPlayClient {
         Block block = mc.level.getBlockState(pos).getBlock();
 
         BlockPos center = null;
+        Direction facing = null;
         if (block instanceof BlockCChess) {
-            GomokuPart part = mc.level.getBlockState(pos).getValue(BlockCChess.PART);
+            var state = mc.level.getBlockState(pos);
+            GomokuPart part = state.getValue(BlockCChess.PART);
             center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+            facing = state.getValue(BlockCChess.FACING);
         } else if (block instanceof BlockWChess) {
-            GomokuPart part = mc.level.getBlockState(pos).getValue(BlockWChess.PART);
+            var state = mc.level.getBlockState(pos);
+            GomokuPart part = state.getValue(BlockWChess.PART);
             center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+            facing = state.getValue(BlockWChess.FACING);
         } else if (block instanceof BlockGomoku) {
-            GomokuPart part = mc.level.getBlockState(pos).getValue(BlockGomoku.PART);
+            var state = mc.level.getBlockState(pos);
+            GomokuPart part = state.getValue(BlockGomoku.PART);
             center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+            facing = state.getValue(BlockGomoku.FACING);
         }
-        if (center == null) {
+        if (center == null || facing == null) {
             return;
         }
         BlockEntity te = mc.level.getBlockEntity(center);
         if (te instanceof TileEntityCChess c) {
-            tryCChess(mc, center, c);
+            tryCChess(mc, center, facing, c);
         } else if (te instanceof TileEntityWChess w) {
-            tryWChess(mc, center, w);
+            tryWChess(mc, center, facing, w);
         } else if (te instanceof TileEntityGomoku g) {
             tryGomoku(mc, center, g);
         }
     }
 
-    private static void tryCChess(Minecraft mc, BlockPos center, TileEntityCChess c) {
+    private static void processPendingClicks() {
+        if (PENDING_CLICKS.isEmpty()) {
+            return;
+        }
+        var it = PENDING_CLICKS.iterator();
+        while (it.hasNext()) {
+            PendingClick pc = it.next();
+            if (pc.delayTicks-- <= 0) {
+                BoardClicker.sendUseItemOn(pc.hit);
+                it.remove();
+            }
+        }
+    }
+
+    private static void tryCChess(Minecraft mc, BlockPos center, Direction facing, TileEntityCChess c) {
         if (!c.isPlayerTurn() || c.isCheckmate() || c.isMoveNumberLimit() || c.isRepeat()) {
             return;
         }
@@ -136,15 +176,16 @@ public class ProxyPlayClient {
                 if (move == 0) {
                     return;
                 }
-                final int moveFinal = move;
-                mc.execute(() -> PacketDistributor.sendToServer(new CChessProxyMovePayload(center, moveFinal)));
+                int fromSq = Position.SRC(move);
+                int toSq = Position.DST(move);
+                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, true));
             } finally {
                 ProxyPlayState.busy = false;
             }
         }, Util.backgroundExecutor());
     }
 
-    private static void tryWChess(Minecraft mc, BlockPos center, TileEntityWChess w) {
+    private static void tryWChess(Minecraft mc, BlockPos center, Direction facing, TileEntityWChess w) {
         if (!w.isPlayerTurn() || w.isCheckmate() || w.isMoveNumberLimit() || w.isRepeat()) {
             return;
         }
@@ -169,8 +210,9 @@ public class ProxyPlayClient {
                 if (move == 0) {
                     return;
                 }
-                final int moveFinal = move;
-                mc.execute(() -> PacketDistributor.sendToServer(new WChessProxyMovePayload(center, moveFinal)));
+                int fromSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.SRC(move);
+                int toSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.DST(move);
+                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, false));
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -199,13 +241,34 @@ public class ProxyPlayClient {
                 if (xy == null) {
                     return;
                 }
-                Point point = new Point(xy[0], xy[1], Point.BLACK);
-                final Point pointFinal = point;
-                mc.execute(() -> PacketDistributor.sendToServer(new GomokuProxyMovePayload(center, pointFinal)));
+                int x = xy[0];
+                int y = xy[1];
+                mc.execute(() -> BoardClicker.sendUseItemOn(BoardClicker.gomokuHit(center, x, y)));
             } finally {
                 ProxyPlayState.busy = false;
             }
         }, Util.backgroundExecutor());
+    }
+
+    /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格 */
+    private static void scheduleChessMove(BlockPos center, Direction facing, int fromSq, int toSq, boolean cchess) {
+        PENDING_CLICKS.add(new PendingClick(chessHit(center, facing, fromSq, cchess), 0));
+        PENDING_CLICKS.add(new PendingClick(chessHit(center, facing, toSq, cchess), CHESS_STEP_DELAY_TICKS));
+    }
+
+    private static BlockHitResult chessHit(BlockPos center, Direction facing, int sq, boolean cchess) {
+        int file;
+        int rank;
+        if (cchess) {
+            file = Position.FILE_X(sq) - Position.FILE_LEFT;
+            rank = Position.RANK_Y(sq) - Position.RANK_TOP;
+        } else {
+            file = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.FILE_X(sq)
+                    - com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.FILE_LEFT;
+            rank = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.RANK_Y(sq)
+                    - com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.RANK_TOP;
+        }
+        return BoardClicker.chessHit(center, facing, file, rank, cchess);
     }
 
     /** 五子棋局面指纹：回合数 + 最近落子，用于判断是否是新回合 */

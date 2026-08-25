@@ -152,10 +152,15 @@ enginePlatforms.each { plat ->
         }
 
         // 打入本平台引擎 + 三平台共享资源（目录缺失时自动跳过，例如本地只有 windows）
+        // CurseForge 自动审核禁止 jar 内含可执行文件（.exe/.sh/.bat），
+        // 故打入 jar 时统一去掉 .exe 后缀，运行时由 EngineExtractor 解压后再补回。
         def platDir = file("src/main/resources/engines/${plat}")
         def sharedDir = file('src/main/resources/engines/shared')
         if (platDir.exists()) {
-            from(platDir) { into "engines/${plat}" }
+            from(platDir) {
+                into "engines/${plat}"
+                rename { String name -> name.endsWith('.exe') ? name.substring(0, name.length() - 4) : name }
+            }
         }
         if (sharedDir.exists()) {
             from(sharedDir) { into 'engines/shared' }

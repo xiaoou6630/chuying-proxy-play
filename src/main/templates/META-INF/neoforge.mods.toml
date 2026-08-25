@@ -45,10 +45,13 @@ logoFile="logo.png" #optional
 authors="xiaoou6630"
 
 # The description text for the mod (multi line!) (#mandatory)
-# 说明：description 会被 Mod 列表界面当作翻译键解析（Component.translatable），
-# 中文/英文分别放在 assets/chuying/lang/zh_cn.json 与 en_us.json 的 mods.toml.description.chuying，
-# 跟随游戏语言显示，而不是把两种语言拼在一起。
-description='''mods.toml.description.chuying'''
+# 说明：NeoForge 1.21.1 的 Mod 列表【不支持】把 description 当作翻译键解析（显示语言键是 1.21.9+ 的新特性），
+# 所以这里直接写中文简介文本；英文简介可写在 en_us 等资源里供其他界面使用。
+description="""
+褚嬴代打（Chuying Proxy Play）：为 Touhou Little Maid 的棋类（五子棋/中国象棋/国际象棋）接入外部强引擎自动落子。
+想体验真正的"老叟戏顽童"？切到极致档，让皮卡鱼/Stockfish/Rapfi 替你下棋，几乎不丢子。
+
+用法：K 键切换开关；设置→控制→按键绑定 可改键；设置→模组→褚嬴代打 可调思考时间与强度。"""
 # 声明 Mixin 配置，让 NeoForge 加载
 [[mixins]]
 config="${mod_id}.mixins.json"
