@@ -98,8 +98,9 @@ public final class EngineExtractor {
         Path sharedDir = dir.resolve("shared");
         Path platDir = dir.resolve(platform());
 
-        extractResources(SHARED_RESOURCES, sharedDir);
-        extractResources(platformResources(), platDir);
+        // 传入各自目录前缀，去掉后才 resolve 到对应目录，避免 engines/shared/shared 双重目录
+        extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/");
+        extractResources(platformResources(), platDir, "engines/" + platform() + "/");
         copySharedToPlatform(sharedDir, platDir);
         makeExecutable(platDir);
     }
@@ -115,10 +116,14 @@ public final class EngineExtractor {
         );
     }
 
-    private static void extractResources(List<String> resources, Path targetRoot) {
+    /**
+     * 解压资源到目标目录。
+     * {@code prefix} 是 jar 内资源的前缀（含 engines/ 与平台/shared 段），
+     * 剥离后剩余的相对路径再 resolve 到 {@code targetRoot}。
+     */
+    private static void extractResources(List<String> resources, Path targetRoot, String prefix) {
         for (String res : resources) {
-            // jar 内资源在 engines/ 下，解压时去掉该前缀，落到 engines 目录根部
-            String rel = res.substring("engines/".length());
+            String rel = res.substring(prefix.length());
             Path target = targetRoot.resolve(rel.replace('/', java.io.File.separatorChar));
             if (Files.exists(target)) {
                 continue;
