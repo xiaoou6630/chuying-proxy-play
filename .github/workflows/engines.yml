@@ -1,13 +1,13 @@
-name: build
+# 只负责构建下棋引擎（三平台二进制），不负责 Java/mod 构建。
+# 仅在仓库手动触发（Actions -> engines -> Run workflow），不会随 push 自动编译。
+name: engines
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
-  build:
-    name: build-${{ matrix.platform }}
+  engines:
+    name: engines-${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -34,31 +34,9 @@ jobs:
         run: bash .github/scripts/setup_engines.sh ${{ matrix.platform }}
         shell: bash
 
-      # TLM 依赖（与本地 libs 一致：1.5.3 neoforge 1.21.1）
-      - name: Download TLM dependency
-        run: |
-          mkdir -p libs
-          curl -fL -o libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar \
-            "https://cdn.modrinth.com/data/R0bDWFAW/versions/tXG1TkGx/touhoulittlemaid-1.5.3-neoforge%2Bmc1.21.1.jar"
-        shell: bash
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Grant gradlew execute permission
-        if: runner.os != 'Windows'
-        run: chmod +x gradlew
-        shell: bash
-
-      - name: Build
-        run: ./gradlew build -x test --no-daemon
-        shell: bash
-
-      - name: Upload artifact
+      - name: Upload engines
         uses: actions/upload-artifact@v4
         with:
-          name: chuying-${{ matrix.platform }}
-          path: build/libs/*.jar
+          name: engines-${{ matrix.platform }}
+          path: src/main/resources/engines/
           if-no-files-found: error
