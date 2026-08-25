@@ -128,6 +128,45 @@ dependencies {
     localRuntime fileTree(dir: 'libs', include: '*.jar')
 }
 
+// ---- 三平台分发包：一次 build 产出 windows/linux/macos 三个 jar，各自只带本平台引擎 ----
+def enginePlatforms = ['windows', 'linux', 'macos']
+
+// 主 jar 不打包引擎，引擎由各平台 jar 携带，避免重复与体积膨胀
+tasks.named('jar', Jar).configure {
+    exclude 'engines/**'
+}
+
+enginePlatforms.each { plat ->
+    tasks.register("jar${plat.capitalize()}", Jar) {
+        group = 'build'
+        archiveBaseName = mod_id
+        archiveVersion = mod_version
+        archiveClassifier = plat
+
+        dependsOn tasks.named('jar')
+
+        // 复用主 jar 全部内容（class、资源、mods.toml 等）
+        from(zipTree(tasks.named('jar').flatMap { it.archiveFile })) {
+            exclude 'engines/**'
+            exclude 'META-INF/MANIFEST.MF' // manifest 由 Jar 任务自动生成
+        }
+
+        // 打入本平台引擎 + 三平台共享资源（目录缺失时自动跳过，例如本地只有 windows）
+        def platDir = file("src/main/resources/engines/${plat}")
+        def sharedDir = file('src/main/resources/engines/shared')
+        if (platDir.exists()) {
+            from(platDir) { into "engines/${plat}" }
+        }
+        if (sharedDir.exists()) {
+            from(sharedDir) { into 'engines/shared' }
+        }
+    }
+}
+
+tasks.named('assemble').configure {
+    dependsOn enginePlatforms.collect { "jar${it.capitalize()}" }
+}
+
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
