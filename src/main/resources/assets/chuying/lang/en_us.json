@@ -1,0 +1,25 @@
+{
+  "mods.toml.description.chuying": "Chuying Proxy Play: lets a strong external engine (Pikafish / Stockfish / Rapfi) play the maid's chess games (Gomoku / Chinese Chess / Western Chess) for you.\nWant a real \"old man toying with a child\"? Set strength to MAX and let the engines play almost without losing pieces.\n\nUsage: press K to toggle; Settings > Controls > Key Binds to rebind; Settings > Mods > Chuying Proxy Play to tune think time and strength.",
+
+  "chuying.configuration.title": "Chuying Proxy Play Configs",
+  "chuying.configuration.section.chuying.client.toml": "Chuying Proxy Play",
+  "chuying.configuration.section.chuying.client.toml.title": "Chuying Proxy Play",
+  "chuying.configuration.enabled": "Enabled",
+  "chuying.configuration.cchessEnginePath": "Chinese Chess Engine Path",
+  "chuying.configuration.wchessEnginePath": "Western Chess Engine Path",
+  "chuying.configuration.gomokuEnginePath": "Gomoku Engine Path",
+  "chuying.configuration.thinkTime": "Think Time (ms)",
+  "chuying.configuration.strength": "Think Strength",
+  "chuying.configuration.strength.LOW": "LOW",
+  "chuying.configuration.strength.DEFAULT": "DEFAULT",
+  "chuying.configuration.strength.HIGH": "HIGH",
+  "chuying.configuration.strength.MAX": "MAX",
+
+  "key.category.chuying": "Chuying Proxy Play",
+  "key.chuying.proxy_play": "Toggle Proxy Play",
+  "hud.chuying.proxy_on": "Chuying Proxy Play: ON",
+  "hud.chuying.proxy_off": "Chuying Proxy Play: OFF",
+  "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine not configured (cchessEnginePath)",
+  "message.chuying.no_wchess_engine": "Chuying: Western Chess engine not configured (wchessEnginePath)",
+  "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine not configured (gomokuEnginePath)"
+}

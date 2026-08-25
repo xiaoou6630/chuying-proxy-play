@@ -1,0 +1,10 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "com.chuying.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "refmap": "chuying.mixins.refmap.json",
+    "mixins": [],
+    "client": [],
+    "server": []
+}

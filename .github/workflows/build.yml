@@ -1,0 +1,64 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: build-${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: windows, os: windows-latest }
+          - { platform: linux,   os: ubuntu-latest }
+          - { platform: macos,   os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+
+      # 组装内置引擎需要的解压工具：Linux/macOS 装 p7zip（Windows 用自带 tar.exe 即可）
+      - name: Install 7z tools
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y p7zip-full
+          else
+            brew install p7zip
+          fi
+        shell: bash
+
+      - name: Download & assemble engines
+        run: bash .github/scripts/setup_engines.sh ${{ matrix.platform }}
+        shell: bash
+
+      # TLM 依赖（与本地 libs 一致：1.5.3 neoforge 1.21.1）
+      - name: Download TLM dependency
+        run: |
+          mkdir -p libs
+          curl -fL -o libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar \
+            "https://cdn.modrinth.com/data/R0bDWFAW/versions/tXG1TkGx/touhoulittlemaid-1.5.3-neoforge%2Bmc1.21.1.jar"
+        shell: bash
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Grant gradlew execute permission
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+        shell: bash
+
+      - name: Build
+        run: ./gradlew build -x test --no-daemon
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chuying-${{ matrix.platform }}
+          path: build/libs/*.jar
+          if-no-files-found: error
