@@ -10,14 +10,16 @@ mkdir -p "$RES/$PLATFORM/rapfi" "$RES/shared/rapfi"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-# 解压 7z：Linux/macOS 用 7z（已安装 p7zip），Windows 用自带 bsdtar(tar.exe)
+# 解压 7z：Linux/macOS 用 7z（已安装 p7zip），Windows 用系统自带 bsdtar(tar.exe)
+# 注意：Windows runner 的 bash 里 `tar` 是 Git Bash 的 GNU tar（不支持 7z），必须显式调 Windows 的 bsdtar
+WIN_TAR="/c/Windows/system32/tar.exe"
 extract_7z() {
   local src="$1" dst="$2"
   mkdir -p "$dst"
   case "$(uname -s)" in
     Darwin) 7z x "$src" "-o$dst" -y >/dev/null ;;
     Linux)  7z x "$src" "-o$dst" -y >/dev/null ;;
-    MINGW*|MSYS*|CYGWIN*) tar -xf "$src" -C "$dst" ;;
+    MINGW*|MSYS*|CYGWIN*) "$WIN_TAR" -xf "$src" -C "$dst" ;;
     *) echo "unsupported system: $(uname -s)" >&2; exit 1 ;;
   esac
 }
@@ -40,7 +42,7 @@ echo "==> [2/3] Stockfish (国际象棋)"
 case "$PLATFORM" in
   windows)
     curl -fL -o "$TMP/sf.zip" "https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-windows-x86-64-avx2.zip"
-    tar -xf "$TMP/sf.zip" -C "$TMP"
+    "$WIN_TAR" -xf "$TMP/sf.zip" -C "$TMP"
     cp "$TMP/stockfish/stockfish-windows-x86-64-avx2.exe" "$RES/windows/stockfish.exe" ;;
   linux)
     curl -fL -o "$TMP/sf.tar" "https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-ubuntu-x86-64-avx2.tar"
