@@ -69,8 +69,11 @@ public final class BoardClicker {
      * part 方块（3x3 之一）作为被点击方块，保证边缘格也能通过校验。
      */
     public static BlockHitResult chessHit(BlockPos center, Direction facing, int file, int rank, boolean cchess) {
-        double cx = cchess ? file * 0.304 - 1.365 : file * 0.25 - 1;
-        double cz = cchess ? rank * 0.304 - 1.370 : rank * 0.25 - 1;
+        // 国象格宽 0.25：坐标 +0.5 格（0.125）偏移到格子中心，避免 (clickPos+1)/0.25 精确落在
+        // floor 整数边界（yRot 的 cos/sin 浮点误差会让微负值被 floor 到前一格，导致落子错位）。
+        // 中象格宽 0.304、常量非精确，天然远离边界，保持原公式。
+        double cx = cchess ? file * 0.304 - 1.365 : (file + 0.5) * 0.25 - 1;
+        double cz = cchess ? rank * 0.304 - 1.370 : (rank + 0.5) * 0.25 - 1;
         // 逆旋转：服务端做 local.yRot(angle)，故 local = clickPos.yRot(-angle)
         Vec3 local = new Vec3(cx, 0, cz).yRot(-facing.toYRot() * Mth.DEG_TO_RAD);
         // 命中点 = center + (0.5,0,0.5) + local

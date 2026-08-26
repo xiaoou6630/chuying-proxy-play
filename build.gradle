@@ -142,6 +142,8 @@ enginePlatforms.each { plat ->
         archiveBaseName = mod_id
         archiveVersion = mod_version
         archiveClassifier = plat
+        // 产物命名：Chuying Proxy Play<版本>-<系统>.jar（与 CurseForge 展示名一致）
+        archiveFileName = "Chuying Proxy Play${mod_version}-${plat}.jar"
 
         dependsOn tasks.named('jar')
 
