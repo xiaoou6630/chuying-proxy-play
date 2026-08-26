@@ -1,9 +1,11 @@
 package com.chuying.client;
 
+import com.chuying.Chuying;
 import com.github.tartaricacid.touhoulittlemaid.block.properties.GomokuPart;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
@@ -62,26 +64,38 @@ public final class BoardClicker {
      * 中象/国象：构造点击 (file, rank) 格的命中结果（file/rank 为相对棋盘原点的下标，0 起）。
      * <p>
      * 推导：TLM 服务端把命中点按 part 偏移后 yRot 旋转得到棋盘坐标系 clickPos，
-     * part 偏移在求世界坐标时会抵消，故被点击方块直接用棋盘中心方块（CENTER part）。
+     * part 偏移在求世界坐标时会抵消，故坐标换算与被点击方块无关。
+     * 但服务端会校验"命中点距被点击方块不能太远"，因此这里动态选择最靠近命中点的
+     * part 方块（3x3 之一）作为被点击方块，保证边缘格也能通过校验。
      */
     public static BlockHitResult chessHit(BlockPos center, Direction facing, int file, int rank, boolean cchess) {
         double cx = cchess ? file * 0.304 - 1.365 : file * 0.25 - 1;
         double cz = cchess ? rank * 0.304 - 1.370 : rank * 0.25 - 1;
         // 逆旋转：服务端做 local.yRot(angle)，故 local = clickPos.yRot(-angle)
         Vec3 local = new Vec3(cx, 0, cz).yRot(-facing.toYRot() * Mth.DEG_TO_RAD);
-        Vec3 hit = new Vec3(center.getX() + 0.5, center.getY(), center.getZ() + 0.5).add(local);
-        return new BlockHitResult(hit, Direction.UP, center, false);
+        // 命中点 = center + (0.5,0,0.5) + local
+        double hx = center.getX() + 0.5 + local.x();
+        double hz = center.getZ() + 0.5 + local.z();
+        // 选一个使命中点落进方块范围内的 part（局部坐标 0.5+local ±0.5）
+        int px = Mth.clamp((int) Math.floor(0.5 + local.x()), -1, 1);
+        int pz = Mth.clamp((int) Math.floor(0.5 + local.z()), -1, 1);
+        BlockPos pos = center.offset(px, 0, pz);
+        Vec3 hit = new Vec3(hx, center.getY(), hz);
+        return new BlockHitResult(hit, Direction.UP, pos, false);
     }
 
-    /** 发送模拟右键（TLM 棋盘要求空手，非空手时忽略） */
+    /** 发送模拟右键（TLM 棋盘要求空手操作，主手非空时提示玩家清空并忽略） */
     public static void sendUseItemOn(BlockHitResult bhr) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.gameMode == null || mc.level == null) {
             return;
         }
         if (!mc.player.getMainHandItem().isEmpty()) {
+            // TLM 棋盘要求空手，不自动改动玩家装备，仅提示
+            mc.player.displayClientMessage(Component.translatable("message.chuying.need_empty_hand"), true);
             return;
         }
+        Chuying.LOGGER.info("[chuying] click pos={} hit={}", bhr.getBlockPos(), bhr.getLocation());
         mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, bhr);
     }
 

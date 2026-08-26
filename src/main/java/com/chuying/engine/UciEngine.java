@@ -29,6 +29,10 @@ public class UciEngine implements AutoCloseable {
     private BufferedWriter writer;
     private final BlockingQueue<String> lines = new LinkedBlockingQueue<>();
     private volatile boolean alive = false;
+    /** 期望的 Aggressiveness（国象 Stockfish 16.1+，避免和棋），-1 = 不设置 */
+    private int targetAggressiveness = -1;
+    /** 已生效的 Aggressiveness，避免重复发送 */
+    private int appliedAggressiveness = -1;
 
     public UciEngine(String command, String... args) {
         this.command = command;
@@ -63,12 +67,27 @@ public class UciEngine implements AutoCloseable {
         alive = true;
     }
 
+    /** 设置 Aggressiveness（仅国象 Stockfish 16.1+ 支持；不支持的引擎会忽略）。每次走子前按需下发 */
+    public synchronized void setAggressiveness(int value) {
+        this.targetAggressiveness = value;
+    }
+
+    /** 在引擎空闲时把待生效的 Aggressiveness 下发，值未变化则跳过 */
+    private void applyAggressiveness() throws IOException {
+        if (targetAggressiveness >= 0 && targetAggressiveness != appliedAggressiveness) {
+            sendLine("setoption name Aggressiveness value " + targetAggressiveness);
+            appliedAggressiveness = targetAggressiveness;
+            Chuying.LOGGER.info("[chuying] uci setoption Aggressiveness {}", targetAggressiveness);
+        }
+    }
+
     /** 让引擎对给定 FEN 局面思考 thinkMs 毫秒，返回 UCI 走法字符串（如 "h2e2" / "e2e4"），失败返回 null */
     public synchronized String bestMove(String fen, int thinkMs) {
         if (!ensureStarted()) {
             return null;
         }
         try {
+            applyAggressiveness();
             sendLine("position fen " + fen);
             sendLine("go movetime " + thinkMs);
             long deadline = System.currentTimeMillis() + thinkMs + 5000L;

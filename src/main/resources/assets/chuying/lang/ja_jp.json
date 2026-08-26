@@ -12,6 +12,11 @@
   "chuying.configuration.strength.DEFAULT": "標準",
   "chuying.configuration.strength.HIGH": "高",
   "chuying.configuration.strength.MAX": "極限",
+  "chuying.configuration.avoidDraw": "引き分け回避（チェスのみ）",
+  "chuying.configuration.avoidDraw.OFF": "オフ",
+  "chuying.configuration.avoidDraw.GENTLE": "穏やか",
+  "chuying.configuration.avoidDraw.ACTIVE": "積極的",
+  "chuying.configuration.avoidDraw.AGGRESSIVE": "極限",
   "chuying.configuration.debugForceMaxMaid": "デバッグ：五目並べのメイドを最高難易度 HELL に強制",
 
   "key.category.chuying": "褚嬴代打",
@@ -20,5 +25,6 @@
   "hud.chuying.proxy_off": "褚嬴代打：OFF",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国将棋エンジンが未設定（cchessEnginePath）",
   "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンが未設定（wchessEnginePath）",
-  "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンが未設定（gomokuEnginePath）"
+  "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンが未設定（gomokuEnginePath）",
+  "message.chuying.need_empty_hand": "褚嬴代打：手を空けてください（盤面は素手が必要）"
 }

@@ -44,6 +44,8 @@ public final class EngineManager {
         if (wchess == null) {
             wchess = new UciEngine(path);
         }
+        // 避和强度（仅国象 Stockfish 支持）：让引擎主动求胜、避免强制和棋，配置实时生效
+        wchess.setAggressiveness(Config.AVOID_DRAW.get().aggressiveness);
         return wchess;
     }
 

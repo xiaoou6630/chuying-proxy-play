@@ -1,5 +1,6 @@
 package com.chuying.client;
 
+import com.chuying.Chuying;
 import com.chuying.Config;
 import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
@@ -152,7 +153,16 @@ public class ProxyPlayClient {
     }
 
     private static void tryCChess(Minecraft mc, BlockPos center, Direction facing, TileEntityCChess c) {
+        // 对局被重置/换新（回合计数回退）时清除局面去重，无需按 K 重启
+        int counter = c.getChessCounter();
+        if (counter < ProxyPlayState.lastCChessCounter) {
+            ProxyPlayState.lastFen = "";
+        }
+        ProxyPlayState.lastCChessCounter = counter;
+
         if (!c.isPlayerTurn() || c.isCheckmate() || c.isMoveNumberLimit() || c.isRepeat()) {
+            Chuying.LOGGER.info("[chuying] cchess skip: turn={} mate={} limit={} repeat={}",
+                    c.isPlayerTurn(), c.isCheckmate(), c.isMoveNumberLimit(), c.isRepeat());
             return;
         }
         String fen = c.getChessData().toFen();
@@ -161,14 +171,17 @@ public class ProxyPlayClient {
         }
         UciEngine engine = EngineManager.cchess();
         if (engine == null) {
+            Chuying.LOGGER.warn("[chuying] cchess engine not available");
             noticeNoEngine("message.chuying.no_cchess_engine");
             return;
         }
         claimPosition(fen);
         int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
+        Chuying.LOGGER.info("[chuying] cchess trigger fen={} center={} facing={}", fen, center, facing);
         CompletableFuture.runAsync(() -> {
             try {
                 String uci = engine.bestMove(fen, thinkMs);
+                Chuying.LOGGER.info("[chuying] cchess bestmove={}", uci);
                 if (uci == null) {
                     return;
                 }
@@ -186,7 +199,16 @@ public class ProxyPlayClient {
     }
 
     private static void tryWChess(Minecraft mc, BlockPos center, Direction facing, TileEntityWChess w) {
+        // 对局被重置/换新（回合计数回退）时清除局面去重，无需按 K 重启
+        int counter = w.getChessCounter();
+        if (counter < ProxyPlayState.lastWChessCounter) {
+            ProxyPlayState.lastFen = "";
+        }
+        ProxyPlayState.lastWChessCounter = counter;
+
         if (!w.isPlayerTurn() || w.isCheckmate() || w.isMoveNumberLimit() || w.isRepeat()) {
+            Chuying.LOGGER.info("[chuying] wchess skip: turn={} mate={} limit={} repeat={}",
+                    w.isPlayerTurn(), w.isCheckmate(), w.isMoveNumberLimit(), w.isRepeat());
             return;
         }
         String fen = w.getChessData().toFen();
@@ -195,14 +217,17 @@ public class ProxyPlayClient {
         }
         UciEngine engine = EngineManager.wchess();
         if (engine == null) {
+            Chuying.LOGGER.warn("[chuying] wchess engine not available");
             noticeNoEngine("message.chuying.no_wchess_engine");
             return;
         }
         claimPosition(fen);
         int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
+        Chuying.LOGGER.info("[chuying] wchess trigger fen={} center={} facing={}", fen, center, facing);
         CompletableFuture.runAsync(() -> {
             try {
                 String uci = engine.bestMove(fen, thinkMs);
+                Chuying.LOGGER.info("[chuying] wchess bestmove={}", uci);
                 if (uci == null) {
                     return;
                 }
@@ -220,10 +245,33 @@ public class ProxyPlayClient {
     }
 
     private static void tryGomoku(Minecraft mc, BlockPos center, TileEntityGomoku g) {
+        // 对局被重置/换新（回合计数回退）时清除局面去重，无需按 K 重启
+        int counter = g.getChessCounter();
+        if (counter < ProxyPlayState.lastGomokuCounter) {
+            ProxyPlayState.lastFen = "";
+        }
+        ProxyPlayState.lastGomokuCounter = counter;
+
         if (!g.isPlayerTurn() || g.getStatue() != Statue.IN_PROGRESS) {
             return;
         }
         byte[][] board = g.getChessData();
+        // 诊断：统计客户端棋盘的黑/白子数，确认 rapfi 收到的局面是否完整
+        int black = 0;
+        int white = 0;
+        StringBuilder occupied = new StringBuilder();
+        for (int x = 0; x < board.length; x++) {
+            for (int y = 0; y < board.length; y++) {
+                if (board[x][y] == Point.BLACK) {
+                    black++;
+                    occupied.append('B').append(x).append(',').append(y).append(' ');
+                } else if (board[x][y] == Point.WHITE) {
+                    white++;
+                    occupied.append('W').append(x).append(',').append(y).append(' ');
+                }
+            }
+        }
+        Chuying.LOGGER.info("[chuying] gomoku trigger black={} white={} board={}", black, white, occupied);
         String fp = gomokuFingerprint(g);
         if (fp.equals(ProxyPlayState.lastFen)) {
             return;
@@ -252,8 +300,12 @@ public class ProxyPlayClient {
 
     /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格 */
     private static void scheduleChessMove(BlockPos center, Direction facing, int fromSq, int toSq, boolean cchess) {
-        PENDING_CLICKS.add(new PendingClick(chessHit(center, facing, fromSq, cchess), 0));
-        PENDING_CLICKS.add(new PendingClick(chessHit(center, facing, toSq, cchess), CHESS_STEP_DELAY_TICKS));
+        BlockHitResult fromHit = chessHit(center, facing, fromSq, cchess);
+        BlockHitResult toHit = chessHit(center, facing, toSq, cchess);
+        Chuying.LOGGER.info("[chuying] {} move fromSq={} toSq={} fromHit={} toHit={}",
+                cchess ? "cchess" : "wchess", fromSq, toSq, fromHit.getLocation(), toHit.getLocation());
+        PENDING_CLICKS.add(new PendingClick(fromHit, 0));
+        PENDING_CLICKS.add(new PendingClick(toHit, CHESS_STEP_DELAY_TICKS));
     }
 
     private static BlockHitResult chessHit(BlockPos center, Direction facing, int sq, boolean cchess) {

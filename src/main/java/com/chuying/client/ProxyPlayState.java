@@ -14,6 +14,10 @@ public final class ProxyPlayState {
     public static volatile long lastSentAt = 0;
     /** 上次提示"未配置引擎"的时间戳，防止刷屏 */
     public static volatile long lastNoEngineNotice = 0;
+    /** 各棋种最近一次看到的回合计数，用于检测"对局被重置/换新"时清除局面去重 */
+    public static volatile int lastCChessCounter = -1;
+    public static volatile int lastWChessCounter = -1;
+    public static volatile int lastGomokuCounter = -1;
 
     private ProxyPlayState() {
     }

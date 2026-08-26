@@ -12,6 +12,11 @@
   "chuying.configuration.strength.DEFAULT": "DEFAULT",
   "chuying.configuration.strength.HIGH": "HIGH",
   "chuying.configuration.strength.MAX": "MAX",
+  "chuying.configuration.avoidDraw": "Avoid Draw Strength (Chess only)",
+  "chuying.configuration.avoidDraw.OFF": "OFF",
+  "chuying.configuration.avoidDraw.GENTLE": "GENTLE",
+  "chuying.configuration.avoidDraw.ACTIVE": "ACTIVE",
+  "chuying.configuration.avoidDraw.AGGRESSIVE": "AGGRESSIVE",
   "chuying.configuration.debugForceMaxMaid": "Debug: Force Gomoku Maid to HELL difficulty",
 
   "key.category.chuying": "Chuying Proxy Play",
@@ -20,5 +25,6 @@
   "hud.chuying.proxy_off": "Chuying Proxy Play: OFF",
   "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine not configured (cchessEnginePath)",
   "message.chuying.no_wchess_engine": "Chuying: Western Chess engine not configured (wchessEnginePath)",
-  "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine not configured (gomokuEnginePath)"
+  "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine not configured (gomokuEnginePath)",
+  "message.chuying.need_empty_hand": "Chuying Proxy Play: empty your main hand (the board requires an empty hand)"
 }

@@ -12,6 +12,11 @@
   "chuying.configuration.strength.DEFAULT": "默认",
   "chuying.configuration.strength.HIGH": "高",
   "chuying.configuration.strength.MAX": "极致",
+  "chuying.configuration.avoidDraw": "避和强度（仅国际象棋）",
+  "chuying.configuration.avoidDraw.OFF": "关闭",
+  "chuying.configuration.avoidDraw.GENTLE": "温和",
+  "chuying.configuration.avoidDraw.ACTIVE": "激进",
+  "chuying.configuration.avoidDraw.AGGRESSIVE": "极致",
   "chuying.configuration.debugForceMaxMaid": "调试：强制五子棋女仆最高难度 HELL",
 
   "key.category.chuying": "褚嬴代打",
@@ -20,5 +25,6 @@
   "hud.chuying.proxy_off": "褚嬴代打：已关闭",
   "message.chuying.no_cchess_engine": "褚嬴代打：未配置中国象棋引擎（cchessEnginePath）",
   "message.chuying.no_wchess_engine": "褚嬴代打：未配置国际象棋引擎（wchessEnginePath）",
-  "message.chuying.no_gomoku_engine": "褚嬴代打：未配置五子棋引擎（gomokuEnginePath）"
+  "message.chuying.no_gomoku_engine": "褚嬴代打：未配置五子棋引擎（gomokuEnginePath）",
+  "message.chuying.need_empty_hand": "褚嬴代打：请空手（棋盘需要空手操作）"
 }
