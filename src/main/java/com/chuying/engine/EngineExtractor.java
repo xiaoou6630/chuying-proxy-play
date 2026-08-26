@@ -35,15 +35,12 @@ import java.util.stream.Stream;
  */
 public final class EngineExtractor {
     private static final String SUB_DIR = "config/chuying/engines";
-    /** 三平台通用资源（jar 内路径，带 engines/ 前缀） */
+    /** 三平台通用资源（jar 内路径，带 engines/ 前缀）。仅含无禁手(freestyle)权重以减小包体 */
     private static final List<String> SHARED_RESOURCES = List.of(
             "engines/shared/pikafish.nnue",
             "engines/shared/rapfi/config.toml",
             "engines/shared/rapfi/model210901.bin",
-            "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4",
-            "engines/shared/rapfi/mix9svqstandard_bs15.bin.lz4",
-            "engines/shared/rapfi/mix9svqrenju_bs15_black.bin.lz4",
-            "engines/shared/rapfi/mix9svqrenju_bs15_white.bin.lz4"
+            "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4"
     );
     /** 各平台可执行文件（jar 内相对路径，不含后缀，enginePath() 会补 .exe） */
     private static final List<String> EXECUTABLES = List.of(

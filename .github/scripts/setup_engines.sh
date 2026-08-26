@@ -58,7 +58,9 @@ echo "==> [3/3] Rapfi (五子棋)"
 # 官方 250615 release 自带三平台二进制（含 macOS apple-silicon）
 curl -fL -o "$TMP/rapfi.7z" "https://github.com/dhbloo/rapfi/releases/download/250615/Rapfi-engine.7z"
 extract_7z "$TMP/rapfi.7z" "$TMP/rapfi7z"
-cp "$TMP/rapfi7z"/config.toml "$TMP/rapfi7z"/model210901.bin "$TMP/rapfi7z"/mix9svq*.bin.lz4 "$RES/shared/rapfi/"
+# 只保留无禁手(freestyle)权重，砍掉有禁手(standard/renju)权重以减小包体（TLM 五子棋为无禁手规则）
+cp "$TMP/rapfi7z"/config.toml "$TMP/rapfi7z"/model210901.bin "$TMP/rapfi7z"/mix9svqfreestyle_bsmix.bin.lz4 "$RES/shared/rapfi/"
+sed -i '/weight_file = "mix9svqstandard_bs15.bin.lz4"/,/weight_file_white = "mix9svqrenju_bs15_white.bin.lz4"/d' "$RES/shared/rapfi/config.toml"
 case "$PLATFORM" in
   windows) cp "$TMP/rapfi7z/pbrain-rapfi-windows-avx2.exe" "$RES/windows/rapfi/pbrain-rapfi.exe" ;;
   linux)   cp "$TMP/rapfi7z/pbrain-rapfi-linux-clang-avx2" "$RES/linux/rapfi/pbrain-rapfi" ;;
