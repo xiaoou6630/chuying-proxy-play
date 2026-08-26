@@ -2,7 +2,7 @@
 
 > 老叟戲頑童（ろうそうぎがんどう）：強い外部エンジンに代わりに打ってもらい、東方小紅魔郷のメイドを打ち負かそう。
 
-**[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)**
+**[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)**
 
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-orange)

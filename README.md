@@ -1,94 +1,94 @@
-# Chuying Proxy Play (褚嬴代打)
+# 褚嬴代打 (Chuying Proxy Play)
 
-> "Old man toying with the child" — let strong engines play for you and crush the maids of Touhou Little Maid.
+> 老叟戏顽童：让外部强引擎替你下棋，虐翻 Touhou Little Maid 的女仆。
 
-**[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)**
+**[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)**
 
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-orange)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-Download-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
+[![CurseForge](https://img.shields.io/badge/CurseForge-下载-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
-An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **NeoForge 1.21.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
+一个基于 **NeoForge 1.21.1** 的 [Touhou Little Maid（车万女仆）](https://modrinth.com/mod/touhou-little-maid) 附属模组：检测到女仆棋局轮到你走子时，自动调用内置引擎替你落子。
 
-> **Pure client, no server mod needed** — engines calculate locally, then your right-click on the board is simulated through vanilla interaction, so the server does **NOT** need this mod installed (works on other people's servers, no network channel mismatch).
+> **纯客户端，服务器免装** —— 引擎在本地算招，再通过原版交互模拟你右键棋盘，因此服务器**不需要**安装本模组（连别人的服务器也能用，不会报网络通道不匹配）。
 
-## Features
+## 特性
 
-| Feature | Description |
+| 特性 | 说明 |
 |---|---|
-| **Pure Client** | Server needs nothing extra; works in singleplayer & on any multiplayer server |
-| **One-key Proxy Play** | Toggle on/off with **K**; keybind remappable in Controls |
-| **4 Think Strength levels** | LOW / DEFAULT / HIGH / MAX — adjustable in-game, applied to the very next move |
-| **Avoid Draw (Chess)** | Push Stockfish to actively seek the win instead of settling for a draw |
-| **Auto-extract engines** | Bundled Windows / Linux / macOS engines extracted on first launch, no setup |
-| **Multi-language** | Simplified Chinese, English, 日本語 |
-| **Debug HELL** | Force the Gomoku maid to HELL difficulty (client-only, for testing) |
+| **纯客户端** | 服务器零改动，单机/联机都能用 |
+| **一键代打** | **K** 键随时启停，可在 控制 里改键 |
+| **思考强度四档** | 低 / 默认 / 高 / 极致 —— 游戏内实时调整，下一步立即生效 |
+| **避和强度（国象）** | 让 Stockfish 主动求胜、拒绝被拖平 |
+| **引擎自动解压** | 内置 Windows / Linux / macOS 引擎，开箱即用 |
+| **三语界面** | 简体中文、English、日本語 |
+| **调试 HELL** | 强制五子棋女仆最高难度 HELL（纯客户端，测试用） |
 
-## Supported Games & Engines
+## 支持的棋种与引擎
 
-| Game | Engine | Protocol |
+| 棋种 | 引擎 | 协议 |
 |---|---|---|
-| Gomoku | [Rapfi](https://github.com/dhbloo/rapfi) | Pbrain |
-| Chinese Chess (Xiangqi) | [Pikafish](https://github.com/official-pikafish/Pikafish) | UCI |
-| International Chess | [Stockfish](https://github.com/official-stockfish/Stockfish) | UCI |
+| 五子棋 | [Rapfi](https://github.com/dhbloo/rapfi) | Pbrain |
+| 中国象棋 | [皮卡鱼 Pikafish](https://github.com/official-pikafish/Pikafish) | UCI |
+| 国际象棋 | [Stockfish](https://github.com/official-stockfish/Stockfish) | UCI |
 
-## Platform Packages
+## 三平台分发包
 
-One build produces three jars — pick the one for your OS:
+一次构建产出三版 jar，按你的系统选择对应版本，**别下错了**：
 
-| File | OS |
+| 文件 | 适用系统 |
 |---|---|
-| `chuying-<version>-windows.jar` | Windows |
-| `chuying-<version>-linux.jar` | Linux (x86-64, AVX2) |
-| `chuying-<version>-macos.jar` | macOS (Apple Silicon) |
+| `chuying-<版本>-windows.jar` | Windows |
+| `chuying-<版本>-linux.jar` | Linux（x86-64, AVX2） |
+| `chuying-<版本>-macos.jar` | macOS（Apple Silicon） |
 
-> Engines are extracted automatically to `config/chuying/engines/` on first run.
+> 引擎首次运行时自动解压到 `config/chuying/engines/`，无需手动配置。
 
-## Requirements
+## 依赖
 
-- NeoForge `21.1.0+` (Minecraft 1.21.1)
-- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) (1.21.1) — **client & server** (the boards come from it)
+- NeoForge `21.1.0+`（Minecraft 1.21.1）
+- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（1.21.1）—— 客户端与服务端都需要（棋盘来自它）
 
-## Installation
+## 安装
 
-1. Install NeoForge 1.21.1 and Touhou Little Maid
-2. Download the jar matching your OS from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases
-3. Put it into `.minecraft/mods/`
-4. Launch the game
+1. 安装 NeoForge 1.21.1 与 Touhou Little Maid
+2. 从 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases 下载与系统匹配的 jar
+3. 放入 `.minecraft/mods/`
+4. 启动游戏
 
-## Usage
+## 使用
 
-- Press **K** to toggle proxy play (remappable in Options → Controls)
-- Walk up to a board, **keep your main hand empty** (the board requires an empty hand), and moves are made for you
-- Settings → Mods → Chuying Proxy Play → Config:
-  - **Think Strength**: LOW (sandbag) → DEFAULT → HIGH → MAX (higher = steadier, fewer blunders)
-  - **Avoid Draw** (Chess only): OFF / GENTLE / ACTIVE / MAX — avoid forced draws
-  - Engine paths can be overridden with your own engines (empty = bundled)
+- 按 **K** 开启/关闭代打（可在 设置 → 控制 → 按键绑定 修改）
+- 走到棋盘旁，**保持空手**（棋盘本身要求空手操作），代打会自动落子
+- 设置 → 模组 → 褚嬴代打 → Config：
+  - **思考强度**：低（放水）→ 默认 → 高 → 极致（越高越稳、越少失子）
+  - **避和强度**（仅国象）：关闭 / 温和 / 激进 / 极致 —— 避免强制和棋
+  - 引擎路径可覆盖为自定义引擎（留空 = 内置）
 
-## How It Works (Pure Client)
+## 纯客户端原理
 
-- The engine calculates the move locally, then the move is converted back into a 3D board position and sent as a **vanilla** `ServerboundUseItemOnPacket` (simulated right-click)
-- The server just sees a player clicking the board normally and lets the installed TLM handle the move — **zero server-side changes or dependencies**
-- Xiangqi/Chess use two-step clicks (select piece → move), Gomoku uses a single click
+- 引擎在客户端本地算招，把走法逆推为棋盘交叉点的 3D 命中坐标，用**原版** `ServerboundUseItemOnPacket`（模拟右键）发送
+- 服务器只当玩家在正常点击棋盘，由它已装的 TLM 完成落子 —— **服务器零改动、零依赖**
+- 中国象棋/国际象棋为"选子→落子"两步模拟点击，五子棋为单次点击
 
-## Internationalization
+## 国际化
 
-UI and hints support Simplified Chinese, English and 日本語, switching automatically with the game language.
+界面与提示支持简体中文、English、日本語，随游戏语言自动切换。
 
-## For Developers
+## 开发者：本地构建
 
-Engine binaries are not committed to git; the GitHub Actions `engines` workflow (manual trigger) assembles and uploads them.
+引擎二进制不进 git 仓库，由 GitHub Actions `engines` 工作流（手动触发）组装并上传 artifact。
 
 ```bash
-# 1. Put engine binaries into src/main/resources/engines/{windows,linux,macos}/ and shared/
-# 2. Build all three platform jars at once
+# 1. 把三平台引擎放入 src/main/resources/engines/{windows,linux,macos}/ 与 shared/
+# 2. 一次构建出三版 jar
 ./gradlew build
 ```
 
-Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `-windows.jar` / `-linux.jar` / `-macos.jar`.
+产物在 `build/libs/`：`chuying-<版本>.jar`（骨架）+ `-windows.jar` / `-linux.jar` / `-macos.jar`。
 
-## License
+## 许可证
 
-**GPL-3.0-only** — bundled engines (Pikafish / Stockfish / Rapfi) are GPL-3.0 as well.
+**GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi）同为 GPL-3.0。
