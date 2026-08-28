@@ -40,10 +40,7 @@ public final class EngineExtractor {
             "engines/shared/pikafish.nnue",
             "engines/shared/rapfi/config.toml",
             "engines/shared/rapfi/model210901.bin",
-            "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4",
-            "engines/shared/rapfi/mix9svqstandard_bs15.bin.lz4",
-            "engines/shared/rapfi/mix9svqrenju_bs15_black.bin.lz4",
-            "engines/shared/rapfi/mix9svqrenju_bs15_white.bin.lz4"
+            "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4"
     );
     /** 各平台可执行文件（jar 内相对路径，不含后缀，enginePath() 会补 .exe） */
     private static final List<String> EXECUTABLES = List.of(

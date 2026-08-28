@@ -68,6 +68,10 @@ public class PbrainGomokuEngine implements AutoCloseable {
         spawnReader();
         lines.clear();
         sendLine("START " + SIZE);
+        // 强制 freestyle（无禁手）规则：TLM 五子棋为无禁手，而 Rapfi 默认可能按禁手规则
+        // （standard/renju）算招，导致黑方避开双三/双四等进攻着法、只下散子防守、打满平局。
+        // Gomocup INFO rule 0 = FREESTYLE（Rapfi 源码 gomocup.cpp 确认）。
+        sendLine("INFO rule 0");
         // 首启冷加载模型可能较慢，给足 20 秒
         long deadline = System.currentTimeMillis() + 20_000;
         String line;
