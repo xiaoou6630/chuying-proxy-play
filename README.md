@@ -5,12 +5,12 @@
 **[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)**
 
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-orange)
-![NeoForge](https://img.shields.io/badge/NeoForge-21.1%2B-green)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
+![Fabric](https://img.shields.io/badge/Fabric-Loader%200.15.11%2B-green)
 [![CurseForge](https://img.shields.io/badge/CurseForge-下载-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
-一个基于 **NeoForge 1.21.1** 的 [Touhou Little Maid（车万女仆）](https://modrinth.com/mod/touhou-little-maid) 附属模组：检测到女仆棋局轮到你走子时，自动调用内置引擎替你落子。
+一个基于 **Fabric 1.20.1** 的 [Touhou Little Maid（车万女仆）](https://modrinth.com/mod/touhou-little-maid) 附属模组：检测到女仆棋局轮到你走子时，自动调用内置引擎替你落子。
 
 > **纯客户端，服务器免装** —— 引擎在本地算招，再通过原版交互模拟你右键棋盘，因此服务器**不需要**安装本模组（连别人的服务器也能用，不会报网络通道不匹配）。
 
@@ -40,20 +40,24 @@
 
 | 文件 | 适用系统 |
 |---|---|
-| `chuying-<版本>-windows.jar` | Windows |
-| `chuying-<版本>-linux.jar` | Linux（x86-64, AVX2） |
-| `chuying-<版本>-macos.jar` | macOS（Apple Silicon） |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-windows.jar` | Windows |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-macos.jar` | macOS（Apple Silicon） |
 
 > 引擎首次运行时自动解压到 `config/chuying/engines/`，无需手动配置。
 
+> 需要 NeoForge 1.21.1 或 Forge 1.20.1 版本？请到 Releases 选择对应分支 / 发行页的 jar。
+
 ## 依赖
 
-- NeoForge `21.1.0+`（Minecraft 1.21.1）
-- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（1.21.1）—— 客户端与服务端都需要（棋盘来自它）
+- Fabric Loader `0.15.11+`（Minecraft 1.20.1）
+- Fabric API
+- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（Orihime Fabric 1.20.1）—— 客户端与服务端都需要（棋盘来自它）
+- ModMenu 与 Cloth Config 已内嵌，**无需**另行安装
 
 ## 安装
 
-1. 安装 NeoForge 1.21.1 与 Touhou Little Maid
+1. 安装 Fabric 1.20.1（Fabric Loader + Fabric API）与 Touhou Little Maid（Orihime Fabric）
 2. 从 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases 下载与系统匹配的 jar
 3. 放入 `.minecraft/mods/`
 4. 启动游戏

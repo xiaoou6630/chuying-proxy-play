@@ -5,12 +5,12 @@
 **[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)**
 
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-orange)
-![NeoForge](https://img.shields.io/badge/NeoForge-21.1%2B-green)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
+![Fabric](https://img.shields.io/badge/Fabric-Loader%200.15.11%2B-green)
 [![CurseForge](https://img.shields.io/badge/CurseForge-ダウンロード-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
-**NeoForge 1.21.1** 向け [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) のアドオン。メイドの盤上対局で自分の手番になると、内蔵エンジンが自動的に打ってくれます。
+**Fabric 1.20.1** 向け [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) のアドオン。メイドの盤上対局で自分の手番になると、内蔵エンジンが自動的に打ってくれます。
 
 > **純クライアント、サーバー側に不要** —— エンジンはローカルで計算し、バニラの操作を模して右クリックを送信するだけ。サーバー側にこの MOD を**入れる必要はありません**（他人のサーバーでも動作、ネットワークチャンネルの不一致も起きません）。
 
@@ -40,20 +40,24 @@
 
 | ファイル | 対応OS |
 |---|---|
-| `chuying-<version>-windows.jar` | Windows |
-| `chuying-<version>-linux.jar` | Linux（x86-64, AVX2） |
-| `chuying-<version>-macos.jar` | macOS（Apple Silicon） |
+| `Chuying Proxy Play<バージョン>-Fabric-1.20.1-windows.jar` | Windows |
+| `Chuying Proxy Play<バージョン>-Fabric-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying Proxy Play<バージョン>-Fabric-1.20.1-macos.jar` | macOS（Apple Silicon） |
 
 > エンジンは初回起動時に `config/chuying/engines/` へ自動展開されます。手動設定は不要です。
 
+> NeoForge 1.21.1 / Forge 1.20.1 版が必要な場合は Releases で対応するブランチ・jar を選んでください。
+
 ## 前提条件
 
-- NeoForge `21.1.0+`（Minecraft 1.21.1）
-- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（1.21.1）—— クライアント・サーバー両方に必要（盤面はこれ由来）
+- Fabric Loader `0.15.11+`（Minecraft 1.20.1）
+- Fabric API
+- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（Orihime Fabric 1.20.1）—— クライアント・サーバー両方に必要（盤面はこれ由来）
+- ModMenu・Cloth Config は同梱済み。**別途導入不要**
 
 ## 導入方法
 
-1. NeoForge 1.21.1 と Touhou Little Maid を導入
+1. Fabric 1.20.1（Loader + API）と Touhou Little Maid（Orihime Fabric）を導入
 2. [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases から OS に合う jar をダウンロード
 3. `.minecraft/mods/` に配置
 4. ゲームを起動
