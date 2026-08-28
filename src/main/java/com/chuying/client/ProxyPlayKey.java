@@ -1,18 +1,16 @@
 package com.chuying.client;
 
-import com.chuying.Chuying;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
-import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
-import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
-import net.neoforged.neoforge.client.settings.KeyConflictContext;
-import net.neoforged.neoforge.client.settings.KeyModifier;
+import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
+import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
+import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
+import net.minecraftforge.client.settings.KeyConflictContext;
+import net.minecraftforge.client.settings.KeyModifier;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * 快捷键与 HUD 注册（仅客户端）。
+ * 快捷键与 HUD 注册（仅客户端，Forge 1.20.1）。
  */
 public class ProxyPlayKey {
     /** 默认键位 K：切换褚嬴代打 */
@@ -28,9 +26,8 @@ public class ProxyPlayKey {
         event.register(PROXY_KEY);
     }
 
-    public static void registerOverlay(RegisterGuiLayersEvent event) {
-        event.registerAbove(VanillaGuiLayers.CROSSHAIR,
-                ResourceLocation.fromNamespaceAndPath(Chuying.MODID, "proxy_play"),
-                new ProxyPlayOverlay());
+    public static void registerOverlay(RegisterGuiOverlaysEvent event) {
+        event.registerAbove(VanillaGuiOverlay.CROSSHAIR.id(),
+                "proxy_play", new ProxyPlayOverlay());
     }
 }

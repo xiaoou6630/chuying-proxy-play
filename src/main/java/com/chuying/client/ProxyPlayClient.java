@@ -26,11 +26,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.InputEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
@@ -44,7 +44,7 @@ import java.util.concurrent.CompletableFuture;
  *       再模拟玩家右键棋盘交叉点落子（走 TLM 原版交互，服务器无需安装本 mod）</li>
  * </ul>
  */
-@EventBusSubscriber(value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = Chuying.MODID, value = Dist.CLIENT)
 public class ProxyPlayClient {
     /** 引擎走法被拒绝等导致局面卡住时，超过该时间重新允许走当前局面 */
     private static final long STUCK_TIMEOUT_MS = 10_000;
@@ -83,7 +83,10 @@ public class ProxyPlayClient {
     }
 
     @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
+            return;
+        }
         // 优先执行排队的模拟点击（象棋两步间隔）
         processPendingClicks();
 
@@ -255,7 +258,14 @@ public class ProxyPlayClient {
         if (!g.isPlayerTurn() || g.getStatue() != Statue.IN_PROGRESS) {
             return;
         }
-        byte[][] board = g.getChessData();
+        int[][] raw = g.getChessData();
+        // TLM getChessData() 返回 int[][]，rapfi 引擎需要 byte[][]（0=空/1=黑/2=白）
+        byte[][] board = new byte[raw.length][raw.length];
+        for (int x = 0; x < raw.length; x++) {
+            for (int y = 0; y < raw[x].length; y++) {
+                board[x][y] = (byte) raw[x][y];
+            }
+        }
         // 诊断：统计客户端棋盘的黑/白子数，确认 rapfi 收到的局面是否完整
         int black = 0;
         int white = 0;

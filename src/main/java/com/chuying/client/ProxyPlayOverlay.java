@@ -1,23 +1,22 @@
 package com.chuying.client;
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
+import net.minecraftforge.client.gui.overlay.ForgeGui;
+import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
 /**
- * HUD 提示：代打开启时在屏幕中上方显示状态。
+ * HUD 提示：代打开启时在屏幕中上方显示状态（Forge 1.20.1）。
  */
-public class ProxyPlayOverlay implements LayeredDraw.Layer {
+public class ProxyPlayOverlay implements IGuiOverlay {
     @Override
-    public void render(@NotNull GuiGraphics guiGraphics, @NotNull DeltaTracker deltaTracker) {
+    public void render(ForgeGui gui, GuiGraphics guiGraphics, float partialTick, int screenWidth, int screenHeight) {
         if (!ProxyPlayState.enabled) {
             return;
         }
         Component text = Component.translatable("hud.chuying.proxy_on");
         guiGraphics.drawCenteredString(Minecraft.getInstance().font, text,
-                guiGraphics.guiWidth() / 2, guiGraphics.guiHeight() / 2 - 40, 0xFFFF55);
+                screenWidth / 2, screenHeight / 2 - 40, 0xFFFF55);
     }
 }
