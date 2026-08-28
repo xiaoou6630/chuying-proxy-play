@@ -56,7 +56,7 @@
 ## 導入方法
 
 1. NeoForge 1.21.1 と Touhou Little Maid を導入
-2. [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases から**ローダー + OS** に合う jar をダウンロード
+2. Releases から**ローダー + OS** に合う jar をダウンロード
 3. `.minecraft/mods/` に配置
 4. ゲームを起動
 

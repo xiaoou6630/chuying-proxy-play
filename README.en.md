@@ -56,7 +56,7 @@ One build produces three jars — pick the one for your OS (don't mix them up):
 ## Installation
 
 1. Install NeoForge 1.21.1 and Touhou Little Maid
-2. Download the jar matching your **loader + OS** from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases
+2. Download the jar matching your **loader + OS** from Releases
 3. Put it into `.minecraft/mods/`
 4. Launch the game
 
