@@ -36,33 +36,26 @@ An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) o
 
 ## Platform Packages
 
-This mod ships **NeoForge 1.21.1 / Forge 1.20.1 / Fabric 1.20.1** loader versions, each producing Windows / Linux / macOS jars. Pick the one matching your **loader + OS** (don't mix them up):
+One build produces three jars — pick the one for your OS (don't mix them up):
 
-| File | Loader | OS |
-|---|---|---|
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-windows.jar` | NeoForge | Windows |
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-linux.jar` | NeoForge | Linux (x86-64, AVX2) |
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-macos.jar` | NeoForge | macOS (Apple Silicon) |
-| `Chuying Proxy Play<ver>-Forge-1.20.1-windows.jar` | Forge | Windows |
-| `Chuying Proxy Play<ver>-Forge-1.20.1-linux.jar` | Forge | Linux (x86-64, AVX2) |
-| `Chuying Proxy Play<ver>-Forge-1.20.1-macos.jar` | Forge | macOS (Apple Silicon) |
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-windows.jar` | Fabric | Windows |
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-linux.jar` | Fabric | Linux (x86-64, AVX2) |
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-macos.jar` | Fabric | macOS (Apple Silicon) |
+| File | OS |
+|---|---|
+| `Chuying Proxy Play<ver>-NeoForge-1.21.1-windows.jar` | Windows |
+| `Chuying Proxy Play<ver>-NeoForge-1.21.1-linux.jar` | Linux (x86-64, AVX2) |
+| `Chuying Proxy Play<ver>-NeoForge-1.21.1-macos.jar` | macOS (Apple Silicon) |
 
 > Engines are extracted automatically to `config/chuying/engines/` on first run.
 
-## Requirements per Loader
+> Need the Forge 1.20.1 or Fabric 1.20.1 build? Pick the matching branch / jar on the Releases page.
 
-| Loader | Required prerequisites | Notes |
-|---|---|---|
-| **NeoForge 1.21.1** | NeoForge `21.1.0+`, [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.3.0` | The boards come from TLM; needed on both client & server |
-| **Forge 1.20.1** | Forge `47+`, [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.5.0` | Cloth Config is JarJar-bundled, **no** separate install |
-| **Fabric 1.20.1** | Fabric Loader `0.15.11+`, Fabric API, [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) (Orihime Fabric) | ModMenu & Cloth Config are bundled, **no** separate install |
+## Requirements
+
+- NeoForge `21.1.0+` (Minecraft 1.21.1)
+- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.3.0` — needed on both client & server (the boards come from it)
 
 ## Installation
 
-1. Install the loader and Touhou Little Maid per the table above
+1. Install NeoForge 1.21.1 and Touhou Little Maid
 2. Download the jar matching your **loader + OS** from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases
 3. Put it into `.minecraft/mods/`
 4. Launch the game
