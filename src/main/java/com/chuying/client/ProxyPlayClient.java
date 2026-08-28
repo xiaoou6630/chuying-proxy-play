@@ -26,26 +26,19 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.InputEvent;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 客户端代打核心（纯客户端）：
+ * 客户端代打核心（纯客户端，Fabric 1.20.1）：
  * <ul>
- *   <li>快捷键 K 切换开关</li>
+ *   <li>每 tick 检测快捷键 K 切换开关</li>
  *   <li>每 tick 检测准星对准的棋盘，轮到玩家且局面变化时，用外挂引擎算招，
  *       再模拟玩家右键棋盘交叉点落子（走 TLM 原版交互，服务器无需安装本 mod）</li>
  * </ul>
  */
-@EventBusSubscriber(value = Dist.CLIENT)
-public class ProxyPlayClient {
+public final class ProxyPlayClient {
     /** 引擎走法被拒绝等导致局面卡住时，超过该时间重新允许走当前局面 */
     private static final long STUCK_TIMEOUT_MS = 10_000;
 
@@ -64,34 +57,31 @@ public class ProxyPlayClient {
         }
     }
 
-    @SubscribeEvent
-    public static void onKey(InputEvent.Key event) {
-        if (event.getAction() == GLFW.GLFW_PRESS && ProxyPlayKey.PROXY_KEY.matches(event.getKey(), event.getScanCode())) {
-            ProxyPlayKey.PROXY_KEY.consumeClick();
+    private ProxyPlayClient() {
+    }
+
+    /** 每客户端 tick 调用：先处理快捷键，再跑代打主逻辑 */
+    public static void tick(Minecraft mc) {
+        while (ProxyPlayKey.PROXY_KEY.consumeClick()) {
             ProxyPlayState.enabled = !ProxyPlayState.enabled;
             if (!ProxyPlayState.enabled) {
                 ProxyPlayState.lastFen = "";
                 ProxyPlayState.lastSentAt = 0;
                 PENDING_CLICKS.clear();
             }
-            Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
                 mc.player.displayClientMessage(Component.translatable(
                         ProxyPlayState.enabled ? "hud.chuying.proxy_on" : "hud.chuying.proxy_off"), true);
             }
         }
-    }
 
-    @SubscribeEvent
-    public static void onClientTick(ClientTickEvent.Post event) {
         // 优先执行排队的模拟点击（象棋两步间隔）
         processPendingClicks();
 
-        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) {
             return;
         }
-        if (!Config.ENABLED.get() || !ProxyPlayState.enabled || ProxyPlayState.busy) {
+        if (!Config.enabled || !ProxyPlayState.enabled || ProxyPlayState.busy) {
             return;
         }
         // 卡住恢复：10 秒无进展则重新允许走当前局面
@@ -176,7 +166,7 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fen);
-        int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
+        int thinkMs = Config.thinkTime * Config.strength.multiplier;
         Chuying.LOGGER.info("[chuying] cchess trigger fen={} center={} facing={}", fen, center, facing);
         CompletableFuture.runAsync(() -> {
             try {
@@ -222,7 +212,7 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fen);
-        int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
+        int thinkMs = Config.thinkTime * Config.strength.multiplier;
         Chuying.LOGGER.info("[chuying] wchess trigger fen={} center={} facing={}", fen, center, facing);
         CompletableFuture.runAsync(() -> {
             try {
@@ -255,7 +245,14 @@ public class ProxyPlayClient {
         if (!g.isPlayerTurn() || g.getStatue() != Statue.IN_PROGRESS) {
             return;
         }
-        byte[][] board = g.getChessData();
+        int[][] raw = g.getChessData();
+        // TLM getChessData() 返回 int[][]，rapfi 引擎需要 byte[][]（0=空/1=黑/2=白）
+        byte[][] board = new byte[raw.length][raw.length];
+        for (int x = 0; x < raw.length; x++) {
+            for (int y = 0; y < raw[x].length; y++) {
+                board[x][y] = (byte) raw[x][y];
+            }
+        }
         // 诊断：统计客户端棋盘的黑/白子数，确认 rapfi 收到的局面是否完整
         int black = 0;
         int white = 0;
@@ -282,7 +279,7 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fp);
-        int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
+        int thinkMs = Config.thinkTime * Config.strength.multiplier;
         CompletableFuture.runAsync(() -> {
             try {
                 int[] xy = engine.bestMove(board, thinkMs);

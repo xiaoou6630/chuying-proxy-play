@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "chuying",
+  "version": "1.0.0",
+  "name": "车万女仆:褚嬴代打",
+  "description": "褚嬴代打（Chuying Proxy Play）：为 Touhou Little Maid 的棋类（五子棋/中国象棋/国际象棋）接入外部强引擎自动落子。纯客户端，服务器免装。",
+  "authors": [
+    "xiaoou6630"
+  ],
+  "license": "GPL-3.0-only",
+  "icon": "logo.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "com.chuying.Chuying"
+    ],
+    "client": [
+      "com.chuying.ChuyingClient"
+    ],
+    "modmenu": [
+      "com.chuying.client.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "chuying.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-api": "*",
+    "minecraft": "1.20.1",
+    "touhou_little_maid": "*",
+    "cloth-config": "*",
+    "modmenu": "*"
+  }
+}

@@ -19,7 +19,7 @@ public final class EngineManager {
     }
 
     public static synchronized UciEngine cchess() {
-        String path = Config.CCHESS_ENGINE.get();
+        String path = Config.cchessEnginePath;
         if (path == null || path.isBlank()) {
             // 配置留空时回落内置引擎（按平台自动选择，Windows 补 .exe）
             path = EngineExtractor.enginePath("pikafish");
@@ -34,7 +34,7 @@ public final class EngineManager {
     }
 
     public static synchronized UciEngine wchess() {
-        String path = Config.WCHESS_ENGINE.get();
+        String path = Config.wchessEnginePath;
         if (path == null || path.isBlank()) {
             path = EngineExtractor.enginePath("stockfish");
         }
@@ -45,12 +45,12 @@ public final class EngineManager {
             wchess = new UciEngine(path);
         }
         // 避和强度（仅国象 Stockfish 支持）：让引擎主动求胜、避免强制和棋，配置实时生效
-        wchess.setAggressiveness(Config.AVOID_DRAW.get().aggressiveness);
+        wchess.setAggressiveness(Config.avoidDraw.aggressiveness);
         return wchess;
     }
 
     public static synchronized PbrainGomokuEngine gomoku() {
-        String path = Config.GOMOKU_ENGINE.get();
+        String path = Config.gomokuEnginePath;
         if (path == null || path.isBlank()) {
             path = EngineExtractor.enginePath("rapfi/pbrain-rapfi");
         }

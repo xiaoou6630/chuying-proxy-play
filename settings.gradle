@@ -1,12 +1,9 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()
-        maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
-        maven { url "https://bmclapi2.bangbang93.com/maven" }
+        maven { url "https://maven.fabricmc.net/" }
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 
-plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
-}
+rootProject.name = "chuying-fabric"

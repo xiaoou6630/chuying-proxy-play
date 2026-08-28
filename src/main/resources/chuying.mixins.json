@@ -1,12 +1,11 @@
 {
-    "required": true,
-    "minVersion": "0.8",
-    "package": "com.chuying.mixin",
-    "compatibilityLevel": "JAVA_21",
-    "refmap": "chuying.mixins.refmap.json",
-    "mixins": [],
-    "client": [
-        "MaidGomokuAIMixin"
-    ],
-    "server": []
+  "required": true,
+  "package": "com.chuying.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "MaidGomokuAIMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

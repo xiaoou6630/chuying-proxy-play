@@ -1,23 +1,23 @@
 package com.chuying.client;
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.LayeredDraw;
 import net.minecraft.network.chat.Component;
-import org.jetbrains.annotations.NotNull;
 
 /**
- * HUD 提示：代打开启时在屏幕中上方显示状态。
+ * HUD 提示：代打开启时在屏幕中上方显示状态（Fabric 1.20.1，HudRenderCallback）。
  */
-public class ProxyPlayOverlay implements LayeredDraw.Layer {
-    @Override
-    public void render(@NotNull GuiGraphics guiGraphics, @NotNull DeltaTracker deltaTracker) {
+public class ProxyPlayOverlay {
+    private ProxyPlayOverlay() {
+    }
+
+    public static void render(GuiGraphics guiGraphics, float tickDelta) {
         if (!ProxyPlayState.enabled) {
             return;
         }
+        Minecraft mc = Minecraft.getInstance();
         Component text = Component.translatable("hud.chuying.proxy_on");
-        guiGraphics.drawCenteredString(Minecraft.getInstance().font, text,
-                guiGraphics.guiWidth() / 2, guiGraphics.guiHeight() / 2 - 40, 0xFFFF55);
+        guiGraphics.drawCenteredString(mc.font, text,
+                mc.getWindow().getGuiScaledWidth() / 2, mc.getWindow().getGuiScaledHeight() / 2 - 40, 0xFFFF55);
     }
 }

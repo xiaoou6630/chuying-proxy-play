@@ -16,9 +16,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(MaidGomokuAI.class)
 public class MaidGomokuAIMixin {
-    @Inject(method = "getService", at = @At("HEAD"), cancellable = true)
+    // TLM 以 mojmap 发布，方法名即 getService，无需（也无法）做 SRG 混淆映射，故 remap=false
+    @Inject(method = "getService", at = @At("HEAD"), cancellable = true, remap = false)
     private static void chuying$forceHell(int winCount, CallbackInfoReturnable<AIService> cir) {
-        if (Config.DEBUG_FORCE_MAX_MAID.get()) {
+        if (Config.debugForceMaxMaid) {
             cir.setReturnValue(MaidGomokuAI.HELL);
         }
     }
