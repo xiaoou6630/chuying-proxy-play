@@ -5,12 +5,12 @@
 **[简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)**
 
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-orange)
-![NeoForge](https://img.shields.io/badge/NeoForge-21.1%2B-green)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
+![Forge](https://img.shields.io/badge/Forge-47%2B-green)
 [![CurseForge](https://img.shields.io/badge/CurseForge-Download-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
-An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **NeoForge 1.21.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
+An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **Forge 1.20.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
 
 > **Pure client, no server mod needed** — engines calculate locally, then your right-click on the board is simulated through vanilla interaction, so the server does **NOT** need this mod installed (works on other people's servers, no network channel mismatch).
 
@@ -40,20 +40,23 @@ One build produces three jars — pick the one for your OS:
 
 | File | OS |
 |---|---|
-| `chuying-<version>-windows.jar` | Windows |
-| `chuying-<version>-linux.jar` | Linux (x86-64, AVX2) |
-| `chuying-<version>-macos.jar` | macOS (Apple Silicon) |
+| `Chuying Proxy Play<ver>-Forge-1.20.1-windows.jar` | Windows |
+| `Chuying Proxy Play<ver>-Forge-1.20.1-linux.jar` | Linux (x86-64, AVX2) |
+| `Chuying Proxy Play<ver>-Forge-1.20.1-macos.jar` | macOS (Apple Silicon) |
 
 > Engines are extracted automatically to `config/chuying/engines/` on first run.
 
+> Need the NeoForge 1.21.1 or Fabric 1.20.1 build? Pick the matching branch / jar on the Releases page.
+
 ## Requirements
 
-- NeoForge `21.1.0+` (Minecraft 1.21.1)
-- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) (1.21.1) — **client & server** (the boards come from it)
+- Forge `47+` (Minecraft 1.20.1)
+- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.5.0` — **client & server** (the boards come from it)
+- Cloth Config is JarJar-bundled, **no** separate install
 
 ## Installation
 
-1. Install NeoForge 1.21.1 and Touhou Little Maid
+1. Install Forge 1.20.1 and Touhou Little Maid
 2. Download the jar matching your OS from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases
 3. Put it into `.minecraft/mods/`
 4. Launch the game
