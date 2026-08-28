@@ -7,7 +7,6 @@
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
 ![Fabric](https://img.shields.io/badge/Fabric-Loader%200.15.11%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-ダウンロード-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
 **Fabric 1.20.1** 向け [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) のアドオン。メイドの盤上対局で自分の手番になると、内蔵エンジンが自動的に打ってくれます。
@@ -58,7 +57,7 @@
 ## 導入方法
 
 1. Fabric 1.20.1（Loader + API）と Touhou Little Maid（Orihime Fabric）を導入
-2. [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases から OS に合う jar をダウンロード
+2. Releases から OS に合う jar をダウンロード
 3. `.minecraft/mods/` に配置
 4. ゲームを起動
 

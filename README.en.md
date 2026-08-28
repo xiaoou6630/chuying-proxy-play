@@ -7,7 +7,6 @@
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
 ![Fabric](https://img.shields.io/badge/Fabric-Loader%200.15.11%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-Download-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
 An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **Fabric 1.20.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
@@ -58,7 +57,7 @@ One build produces three jars — pick the one for your OS:
 ## Installation
 
 1. Install Fabric 1.20.1 (Loader + API) and Touhou Little Maid (Orihime Fabric)
-2. Download the jar matching your OS from [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases
+2. Download the jar matching your OS from Releases
 3. Put it into `.minecraft/mods/`
 4. Launch the game
 

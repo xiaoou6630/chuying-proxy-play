@@ -7,7 +7,6 @@
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
 ![Fabric](https://img.shields.io/badge/Fabric-Loader%200.15.11%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-下载-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
 一个基于 **Fabric 1.20.1** 的 [Touhou Little Maid（车万女仆）](https://modrinth.com/mod/touhou-little-maid) 附属模组：检测到女仆棋局轮到你走子时，自动调用内置引擎替你落子。
@@ -58,7 +57,7 @@
 ## 安装
 
 1. 安装 Fabric 1.20.1（Fabric Loader + Fabric API）与 Touhou Little Maid（Orihime Fabric）
-2. 从 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases 下载与系统匹配的 jar
+2. 从 Releases 下载与系统匹配的 jar
 3. 放入 `.minecraft/mods/`
 4. 启动游戏
 
