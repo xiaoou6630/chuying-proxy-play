@@ -36,25 +36,34 @@
 
 ## 三平台分发包
 
-一次构建产出三版 jar，按你的系统选择对应版本，**别下错了**：
+本模组提供 **NeoForge 1.21.1 / Forge 1.20.1 / Fabric 1.20.1** 三个加载器版本，每个加载器又按系统产出 Windows / Linux / macOS 三个 jar。按你的**加载器 + 系统**选择对应版本，**别下错了**：
 
-| 文件 | 适用系统 |
-|---|---|
-| `chuying-<版本>-windows.jar` | Windows |
-| `chuying-<版本>-linux.jar` | Linux（x86-64, AVX2） |
-| `chuying-<版本>-macos.jar` | macOS（Apple Silicon） |
+| 文件 | 加载器 | 适用系统 |
+|---|---|---|
+| `Chuying Proxy Play<版本>-NeoForge-1.21.1-windows.jar` | NeoForge | Windows |
+| `Chuying Proxy Play<版本>-NeoForge-1.21.1-linux.jar` | NeoForge | Linux（x86-64, AVX2） |
+| `Chuying Proxy Play<版本>-NeoForge-1.21.1-macos.jar` | NeoForge | macOS（Apple Silicon） |
+| `Chuying Proxy Play<版本>-Forge-1.20.1-windows.jar` | Forge | Windows |
+| `Chuying Proxy Play<版本>-Forge-1.20.1-linux.jar` | Forge | Linux（x86-64, AVX2） |
+| `Chuying Proxy Play<版本>-Forge-1.20.1-macos.jar` | Forge | macOS（Apple Silicon） |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-windows.jar` | Fabric | Windows |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-linux.jar` | Fabric | Linux（x86-64, AVX2） |
+| `Chuying Proxy Play<版本>-Fabric-1.20.1-macos.jar` | Fabric | macOS（Apple Silicon） |
 
 > 引擎首次运行时自动解压到 `config/chuying/engines/`，无需手动配置。
 
-## 依赖
+## 各平台前置
 
-- NeoForge `21.1.0+`（Minecraft 1.21.1）
-- [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（1.21.1）—— 客户端与服务端都需要（棋盘来自它）
+| 加载器 | 必须安装的前置 | 说明 |
+|---|---|---|
+| **NeoForge 1.21.1** | NeoForge `21.1.0+`、[Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.3.0` | 棋盘来自 TLM，客户端/服务端都需要 |
+| **Forge 1.20.1** | Forge `47+`、[Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.5.0` | Cloth Config 已 JarJar 内嵌，**无需**另行安装 |
+| **Fabric 1.20.1** | Fabric Loader `0.15.11+`、Fabric API、[Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid)（Orihime Fabric） | ModMenu 与 Cloth Config 已内嵌，**无需**另行安装 |
 
 ## 安装
 
-1. 安装 NeoForge 1.21.1 与 Touhou Little Maid
-2. 从 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases 下载与系统匹配的 jar
+1. 按上面的前置表安装对应的加载器与 Touhou Little Maid
+2. 从 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play) / Releases 下载**加载器 + 系统**匹配的 jar
 3. 放入 `.minecraft/mods/`
 4. 启动游戏
 

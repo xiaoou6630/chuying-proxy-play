@@ -51,6 +51,8 @@ description="""
 褚嬴代打（Chuying Proxy Play）：为 Touhou Little Maid 的棋类（五子棋/中国象棋/国际象棋）接入外部强引擎自动落子。
 想体验真正的"老叟戏顽童"？切到极致档，让皮卡鱼/Stockfish/Rapfi 替你下棋，几乎不丢子。
 
+前置：NeoForge 21.1+、Touhou Little Maid (TLM) 1.21.1。
+
 用法：K 键切换开关；设置→控制→按键绑定 可改键；设置→模组→褚嬴代打 可调思考时间与强度。"""
 # 声明 Mixin 配置，让 NeoForge 加载
 [[mixins]]
