@@ -15,6 +15,8 @@ import java.util.Map;
 public final class NativeUciEngine implements AutoCloseable {
     private static final int HANDSHAKE_TIMEOUT_MS = 15000;
     private static final int STOP_GRACE_MS = 5000;
+    /** 单次读取等待上限；读空只表示「暂时没输出」，不代表引擎出问题 */
+    private static final int READ_SLICE_MS = 200;
 
     private final NativeEngineBridge bridge = new NativeEngineBridge();
     private final String libPath;
@@ -69,19 +71,29 @@ public final class NativeUciEngine implements AutoCloseable {
         applyAggressiveness();
         send("position fen " + fen);
         send("go movetime " + thinkMs);
-        long deadline = System.currentTimeMillis() + thinkMs + STOP_GRACE_MS;
-        String line;
-        while ((line = readUntil(deadline)) != null) {
-            if (line.startsWith("bestmove")) {
-                String[] parts = line.split("\\s+");
-                return parts.length >= 2 ? parts[1] : null;
-            }
+        String move = awaitBestMove(System.currentTimeMillis() + thinkMs + STOP_GRACE_MS);
+        if (move != null) {
+            return move;
         }
         // 超时：通知引擎停止思考，再给一段宽限收 bestmove（进程内引擎不能杀，只能协商）
         Chuying.LOGGER.warn("原生 UCI 引擎思考超时，发送 stop");
         send("stop");
-        deadline = System.currentTimeMillis() + STOP_GRACE_MS;
-        while ((line = readUntil(deadline)) != null) {
+        return awaitBestMove(System.currentTimeMillis() + STOP_GRACE_MS);
+    }
+
+    /**
+     * 读到 bestmove 或超时为止。
+     * <p>
+     * 注意：单次读超时（引擎正在搜索、暂时无输出）必须继续等，不能直接判失败——
+     * 引擎加载 NNUE 或长考时出现超过一个读取间隔的空档是正常的。
+     */
+    private String awaitBestMove(long deadline) {
+        while (System.currentTimeMillis() < deadline) {
+            String line = bridge.read(READ_SLICE_MS);
+            if (line == null) {
+                continue;
+            }
+            logIfError(line);
             if (line.startsWith("bestmove")) {
                 String[] parts = line.split("\\s+");
                 return parts.length >= 2 ? parts[1] : null;
@@ -103,10 +115,15 @@ public final class NativeUciEngine implements AutoCloseable {
         }
     }
 
+    /** 等待某个完整标记行（如 uciok / readyok）；单次读超时不代表失败，会一直等到 deadline */
     private boolean waitFor(String marker, int timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
-        String line;
-        while ((line = readUntil(deadline)) != null) {
+        while (System.currentTimeMillis() < deadline) {
+            String line = bridge.read(READ_SLICE_MS);
+            if (line == null) {
+                continue;
+            }
+            logIfError(line);
             if (marker.equalsIgnoreCase(line.trim())) {
                 return true;
             }
@@ -114,20 +131,11 @@ public final class NativeUciEngine implements AutoCloseable {
         return false;
     }
 
-    private String readUntil(long deadline) {
-        long wait = deadline - System.currentTimeMillis();
-        if (wait <= 0) {
-            return null;
-        }
-        String line = bridge.read((int) Math.min(wait, 500));
-        if (line == null) {
-            return null;
-        }
+    private void logIfError(String line) {
         String lower = line.toLowerCase();
         if (lower.contains("not found") || lower.startsWith("error")) {
             Chuying.LOGGER.warn("[chuying] 原生引擎输出: {}", line);
         }
-        return line;
     }
 
     private void send(String cmd) {

@@ -40,23 +40,20 @@ public final class EngineManager {
         return cchess;
     }
 
-    /** 国际象棋（Stockfish，进程内）；附带避和强度配置透传 */
+    /**
+     * 国际象棋（Stockfish，进程内）；附带避和强度配置透传。
+     * <p>
+     * Stockfish 的两份 NNUE 权重在 CI 构建时已用 INCBIN 编进原生库（默认
+     * EvalFile/EvalFileSmall 即内嵌权重），因此不再解压/下发权重文件，
+     * 也不再随 jar 重复打包一份（省 78MB）。
+     */
     public static synchronized NativeUciEngine wchess() {
         if (wchess == null) {
             String lib = EngineExtractor.nativeLibPath("chuying_stockfish");
             if (lib == null) {
                 return null;
             }
-            Map<String, String> options = new LinkedHashMap<>();
-            String mainNet = EngineExtractor.dataFilePath("stockfish/nn-1c0000000000.nnue");
-            String smallNet = EngineExtractor.dataFilePath("stockfish/nn-37f18f62d772.nnue");
-            if (mainNet != null) {
-                options.put("EvalFile", mainNet);
-            }
-            if (smallNet != null) {
-                options.put("EvalFileSmall", smallNet);
-            }
-            wchess = new NativeUciEngine(lib, options);
+            wchess = new NativeUciEngine(lib, Map.of());
         }
         // 避和强度（仅国象 Stockfish 支持）：让引擎主动求胜、避免强制和棋，配置实时生效
         wchess.setAggressiveness(Config.AVOID_DRAW.get().aggressiveness);

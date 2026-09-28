@@ -42,8 +42,6 @@ public final class EngineExtractor {
     /** 三平台通用权重/模型（jar 内路径，带 engines/ 前缀） */
     private static final List<String> SHARED_RESOURCES = List.of(
             "engines/shared/pikafish.nnue",
-            "engines/shared/stockfish/nn-1c0000000000.nnue",
-            "engines/shared/stockfish/nn-37f18f62d772.nnue",
             "engines/shared/rapfi/config.toml",
             "engines/shared/rapfi/model210901.bin",
             "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4"
