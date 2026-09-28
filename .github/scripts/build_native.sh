@@ -147,16 +147,25 @@ fi
 # build crashes inside NNUE evaluation; it also breaks Pikafish's static init.
 # MinGW has the same compiler semantics as the proven linux/macos builds.
 if [ "$PLATFORM" = "windows" ]; then
-    MINGW=""
-    for cand in /c/msys64/mingw64 /d/a/msys64/mingw64 /c/tools/msys64/mingw64; do
-        if [ -x "$cand/bin/g++.exe" ]; then MINGW="$cand"; break; fi
+    # setup-msys2 puts the toolchain on PATH; fall back to well-known locations.
+    GXX_BIN=""
+    for name in g++.exe g++; do
+        if command -v "$name" >/dev/null 2>&1; then
+            GXX_BIN="$(cd "$(dirname "$(command -v "$name")")" && pwd)"
+            break
+        fi
     done
-    [ -n "$MINGW" ] || { log "ERROR: MinGW-w64 g++ not found (looked in msys64/mingw64)"; exit 1; }
-    log "mingw toolchain: $MINGW"
-    export PATH="$MINGW/bin:$PATH"
+    if [ -z "$GXX_BIN" ]; then
+        for cand in /c/msys64/mingw64/bin /d/a/msys64/mingw64/bin /c/tools/msys64/mingw64/bin; do
+            if [ -x "$cand/g++.exe" ]; then GXX_BIN="$cand"; break; fi
+        done
+    fi
+    [ -n "$GXX_BIN" ] || { log "ERROR: MinGW-w64 g++ not found; PATH=$PATH"; exit 1; }
+    log "mingw toolchain: $GXX_BIN"
+    export PATH="$GXX_BIN:$PATH"
     CMAKE_ARGS+=(-G Ninja
-                 -DCMAKE_C_COMPILER="$MINGW/bin/gcc.exe"
-                 -DCMAKE_CXX_COMPILER="$MINGW/bin/g++.exe")
+                 -DCMAKE_C_COMPILER="$GXX_BIN/gcc.exe"
+                 -DCMAKE_CXX_COMPILER="$GXX_BIN/g++.exe")
 fi
 
 log "cmake configure: ${CMAKE_ARGS[*]}"
