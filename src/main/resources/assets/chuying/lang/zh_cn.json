@@ -3,9 +3,6 @@
   "chuying.configuration.section.chuying.client.toml": "褚嬴代打",
   "chuying.configuration.section.chuying.client.toml.title": "褚嬴代打",
   "chuying.configuration.enabled": "启用代打功能",
-  "chuying.configuration.cchessEnginePath": "中国象棋引擎路径（皮卡鱼等 UCI 引擎）",
-  "chuying.configuration.wchessEnginePath": "国际象棋引擎路径（Stockfish 等 UCI 引擎）",
-  "chuying.configuration.gomokuEnginePath": "五子棋引擎路径（Rapfi 等 pbrain 引擎）",
   "chuying.configuration.thinkTime": "每步思考时间（毫秒）",
   "chuying.configuration.strength": "思考强度",
   "chuying.configuration.strength.LOW": "低",
@@ -23,8 +20,8 @@
   "key.chuying.proxy_play": "切换代打开关",
   "hud.chuying.proxy_on": "褚嬴代打：已开启",
   "hud.chuying.proxy_off": "褚嬴代打：已关闭",
-  "message.chuying.no_cchess_engine": "褚嬴代打：未配置中国象棋引擎（cchessEnginePath）",
-  "message.chuying.no_wchess_engine": "褚嬴代打：未配置国际象棋引擎（wchessEnginePath）",
-  "message.chuying.no_gomoku_engine": "褚嬴代打：未配置五子棋引擎（gomokuEnginePath）",
+  "message.chuying.no_cchess_engine": "褚嬴代打：中国象棋引擎库缺失或解压失败",
+  "message.chuying.no_wchess_engine": "褚嬴代打：国际象棋引擎库缺失或解压失败",
+  "message.chuying.no_gomoku_engine": "褚嬴代打：五子棋引擎库缺失或解压失败",
   "message.chuying.need_empty_hand": "褚嬴代打：请空手（棋盘需要空手操作）"
 }

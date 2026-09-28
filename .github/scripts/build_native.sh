@@ -154,8 +154,9 @@ for net in "$ENGINES/stockfish/src/"nn-*.nnue; do
     [ -e "$net" ] || continue
     base=$(basename "$net")
     sha12=$(sha256sum "$net" | cut -c1-12)
-    [ "${base#nn-}" = "${sha12}" ] || { log "WARN: $base hash mismatch ($sha12)"; }
-    (cd native/dist/nets && split -b 10m -d "$ENGINES/stockfish/src/$base" "$base.part.")
+    stem="${base%.nnue}"; stem="${stem#nn-}"
+    [ "$stem" = "$sha12" ] || log "WARN: $base hash mismatch ($sha12)"
+    split -b 10m -d "$net" "native/dist/nets/$base.part."
 done
 ls -la native/dist/nets/ | head -20
 log "done"
