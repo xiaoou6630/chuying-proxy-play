@@ -19,6 +19,19 @@ sed_inplace() {
     if sed --version >/dev/null 2>&1; then /usr/bin/sed -i "$@"; else /usr/bin/sed -i '' "$@"; fi
 }
 
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# 7z extraction: Linux/macOS use p7zip, Windows uses the system bsdtar (tar.exe)
+extract_7z() {
+    local src="$1" dst="$2"
+    mkdir -p "$dst"
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*) /c/Windows/system32/tar.exe -xf "$src" -C "$dst" ;;
+        *) 7z x "$src" "-o$dst" -y >/dev/null ;;
+    esac
+}
+
 git_clone() { # url dir [ref]
     local url="$1" dir="$2" ref="${3:-}"
     rm -rf "$dir"
@@ -46,6 +59,17 @@ for net in $(grep -rhoE 'nn-[0-9a-f]{12}\.nnue' "$ENGINES/stockfish/src" | sort 
     echo "$net $(stat -c%s "$ENGINES/stockfish/src/$net" 2>/dev/null || wc -c < "$ENGINES/stockfish/src/$net") bytes"
 done
 ls -la "$ENGINES/stockfish/src/"*.nnue
+
+# Pikafish embeds its net as src/pikafish.nnue (EvalFileDefaultName) and refuses to
+# start without it. No direct file URL exists, so take it from the release 7z.
+log "downloading pikafish NNUE net"
+PKF_URL="$(curl -fsSL https://api.github.com/repos/official-pikafish/Pikafish/releases/latest \
+  | grep -o '"browser_download_url": *"[^"]*\.7z"' | head -1 | sed 's/.*: *"//;s/"$//')"
+[ -n "$PKF_URL" ] || { log "ERROR: pikafish release url not found"; exit 1; }
+curl -fL -o "$TMP/pikafish.7z" "$PKF_URL"
+extract_7z "$TMP/pikafish.7z" "$TMP/pkf"
+cp "$TMP/pkf/pikafish.nnue" "$ENGINES/pikafish/src/pikafish.nnue"
+ls -la "$ENGINES/pikafish/src/pikafish.nnue"
 
 # ---------------------------------------------------------------------------
 # 2. Patch CMakeLists: add_executable -> add_library STATIC (Rapfi uses its

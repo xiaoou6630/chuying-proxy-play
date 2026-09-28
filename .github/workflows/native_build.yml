@@ -31,6 +31,17 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # 7z for the Pikafish net archive (Windows uses the bundled bsdtar instead)
+      - name: Install 7z
+        if: matrix.platform != 'windows'
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y p7zip-full
+          else
+            brew install p7zip
+          fi
+        shell: bash
+
       # Windows builds engines with MinGW-w64 gcc (MSVC breaks NNUE eval and INCBIN)
       - name: Set up MinGW-w64
         if: matrix.platform == 'windows'
