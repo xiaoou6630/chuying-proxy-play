@@ -12,26 +12,34 @@ import net.minecraft.world.phys.Vec3;
  * 换算公式与 {@link BoardClicker} 同一思路，逆推自 {@code BlockJChess.useItemOn} 字节码：
  * <pre>
  *   local = (hitLoc - clickedPartPos + (partX - 0.5, 0, partY - 0.5)).yRot(facing.toYRot())
- *   point = JChessUtil.getClickPosition(local)
+ *   point = JChessUtil.getClickPosition(local, position)
  * </pre>
  * 由于 part 的世界偏移恰等于其 {@code PART} 的 (posX,posY)，式中的 part 偏移在求世界坐标时抵消，
  * 于是：{@code hitLoc.xz = center + (0.5,0.5) + local.yRot(-angle)}。
  * <p>
- * 格点号换算（逆推自 {@code JChessUtil.getClickPosition} 字节码）：
+ * 格点号换算（常量取自正式版 {@code JChessUtil} 字节码）：
  * <ul>
  *   <li>棋盘格 0~80：{@code i = floor((lx+0.4744)/0.1055)}、{@code j = floor((lz+0.4744)/0.1055)}，{@code point = i + j*9}</li>
- *   <li>手驹 81~89：{@code i = floor((lx-0.512)/0.1167)}、{@code j = floor((lz-0.157)/0.1096)}，{@code point = 81 + i + j*3}</li>
+ *   <li>手驹 81~89：{@code col = floor((lx-0.539153125)/0.1167)}、{@code row = floor((lz-0.156425)/0.1096)}，{@code point = 81 + col + row*3}</li>
  * </ul>
+ * <p>
+ * 命中点的 <b>局部 y 必须为 {@code BOARD_SURFACE_Y}=0.625</b>：正式版
+ * {@code JChessUtil.getPlayerHandPosition} 会校验 {@code y≈0.625}（否则手驹落子被判为无效）。
+ * 棋盘格不使用 y，因此统一取 0.625 对两者都安全。
  */
 public final class ShogiBoardClicker {
-    /** 棋盘格宽/原点（TLM getClickPosition 常量） */
+    /** 棋盘格宽/原点（正式版 JChessUtil.getClickPosition 常量） */
     private static final double STEP = 0.1055;
     private static final double ORIGIN = 0.4744;
-    /** 手驹 3x3 区域起点与格距 */
-    private static final double HAND_X0 = 0.512;
-    private static final double HAND_DX = 0.1167;
-    private static final double HAND_Z0 = 0.157;
-    private static final double HAND_DZ = 0.1096;
+    /** 命中点局部高度（正式版 JChessUtil.BOARD_SURFACE_Y） */
+    private static final double BOARD_SURFACE_Y = 0.625;
+    /** 手驹区 3x3：每格起点 + 格距 + 驹占据宽/深（正式版 JChessUtil 常量） */
+    private static final double HAND_PIECE_MIN_X = 0.539153125;
+    private static final double HAND_SLOT_WIDTH = 0.1167;
+    private static final double HAND_PIECE_WIDTH = 0.09509375;
+    private static final double HAND_PIECE_MIN_Z = 0.156425;
+    private static final double HAND_SLOT_DEPTH = 0.1096;
+    private static final double HAND_PIECE_DEPTH = 0.099078125;
 
     private ShogiBoardClicker() {
     }
@@ -53,10 +61,10 @@ public final class ShogiBoardClicker {
             lz = (j + 0.5) * STEP - ORIGIN;
         } else {
             int idx = pointNum - 81;
-            int i = idx % 3;
-            int j = idx / 3;
-            lx = HAND_X0 + (i + 0.5) * HAND_DX;
-            lz = HAND_Z0 + (j + 0.5) * HAND_DZ;
+            int col = idx % 3;
+            int row = idx / 3;
+            lx = HAND_PIECE_MIN_X + col * HAND_SLOT_WIDTH + HAND_PIECE_WIDTH / 2.0;
+            lz = HAND_PIECE_MIN_Z + row * HAND_SLOT_DEPTH + HAND_PIECE_DEPTH / 2.0;
         }
         // 逆旋转：服务端做 local.yRot(angle)，故 worldDelta = local.yRot(-angle)
         Vec3 delta = new Vec3(lx, 0, lz).yRot(-facing.toYRot() * Mth.DEG_TO_RAD);
@@ -74,7 +82,8 @@ public final class ShogiBoardClicker {
         BlockPos pos = center.offset(dx, 0, dz);
         double hx = center.getX() + 0.5 + delta.x;
         double hz = center.getZ() + 0.5 + delta.z;
-        Vec3 hit = new Vec3(hx, center.getY(), hz);
+        // 局部 y = hit.y - pos.y，需为 BOARD_SURFACE_Y（手驹落子校验要求）
+        Vec3 hit = new Vec3(hx, pos.getY() + BOARD_SURFACE_Y, hz);
         return new BlockHitResult(hit, Direction.UP, pos, false);
     }
 }

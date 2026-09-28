@@ -17,7 +17,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,24 +25,40 @@ import java.util.Optional;
  * 玩家未安装 tlm_shogi 时 {@link #isAvailable()} 返回 false，整体禁用将棋代打，
  * 其余棋种与 mod 其它功能不受影响、不崩溃；探测失败只打一次警告。
  * <p>
- * 落子路径已通过 javap 字节码核实：将棋玩家落子走的是 <b>原版右键</b>
- * （{@code BlockJChess.useItemOn}），服务器按 {@code JChessUtil.getClickPosition} 把命中点
- * 换算成格点号（0~80 棋盘、81~89 手驹），因此本类只负责「读局面 → 算招 → 交给模拟右键」。
+ * 探测按<b>正式版（1.0.0）</b>类名进行，并逐个方法容错：任意类/方法缺失都不会让
+ * 探测抛异常（先前第一处 {@code Class.forName} 就抛 CNFE 的问题已消除）。
+ * 正式版与 beta 的差异已在 javap 字节码层面核实：
+ * <ul>
+ *   <li>局面类是 {@code engine.core.Position}（beta 为 {@code api.game.jchess.Position}），
+ *       SFEN 提取方法为 {@code toSfen()}（beta 为 {@code toUSI()}）；</li>
+ *   <li>坐标/手驹换算在 {@code util.JChessUiAdapter}：{@code Square.parseSfen} +
+ *       {@code pointFromSquare} 得到格点号，{@code handIndex(pos, Turn.BLACK, type)} 得到手驹槽位；</li>
+ *   <li>{@code JChessUtil.getClickPosition(Vec3, Position)} 是「命中点→格点号」，
+ *       本类只负责「读局面 → 算招 → USI → 格点号 → 交给模拟右键」。</li>
+ * </ul>
  * <p>
- * 升变（promote）例外：当走法是「可选升变」时，服务器会向本客户端弹
+ * 升变（promote）例外：走法存在「升/不升」两种合法选择时，服务器向本客户端弹
  * {@code JChessPromoteOpenPackage} → 客户端弹出 {@code JChessPromoteScreen}。
  * 代打必须在 {@link #autoAnswerPromote} 里自动应答 {@code JChessPromoteResultPackage}，否则会卡住。
  */
 public final class ShogiCompat {
     private static final String TE_CLASS = "com.github.sangeeeee.tlm_shogi.tileentity.TileEntityJChess";
     private static final String BLOCK_CLASS = "com.github.sangeeeee.tlm_shogi.block.BlockJChess";
-    private static final String POSITION_CLASS = "com.github.sangeeeee.tlm_shogi.api.game.jchess.Position";
-    private static final String POSITION_UTIL_CLASS = "com.github.sangeeeee.tlm_shogi.api.game.jchess.PositionUtil";
     private static final String PART_CLASS = "com.github.sangeeeee.tlm_shogi.block.properties.ShogiPart";
+    /** 正式版在 {@code engine.core}，beta 在 {@code api.game.jchess}；两者都探测，哪个在就用哪个 */
+    private static final String[] POSITION_CLASSES = {
+            "com.github.sangeeeee.tlm_shogi.engine.core.Position",
+            "com.github.sangeeeee.tlm_shogi.api.game.jchess.Position",
+    };
+    private static final String SQUARE_CLASS = "com.github.sangeeeee.tlm_shogi.engine.core.Square";
+    private static final String TURN_CLASS = "com.github.sangeeeee.tlm_shogi.engine.core.Turn";
+    private static final String PIECE_TYPE_CLASS = "com.github.sangeeeee.tlm_shogi.engine.core.PieceType";
+    private static final String UI_ADAPTER_CLASS = "com.github.sangeeeee.tlm_shogi.util.JChessUiAdapter";
     private static final String SUNFISH_RESOURCES = "com.github.sangeeeee.tlm_shogi.engine.SunfishResources";
     private static final String SUNFISH_ENGINE = "com.github.sangeeeee.tlm_shogi.engine.SunfishEngine";
     private static final String SEARCH_LIMITS = "com.github.sangeeeee.tlm_shogi.engine.SearchLimits";
     private static final String SEARCH_REQUEST = "com.github.sangeeeee.tlm_shogi.engine.SearchRequest";
+    private static final String SEARCH_RESULT = "com.github.sangeeeee.tlm_shogi.engine.SearchResult";
     private static final String CANCELLATION_TOKEN = "com.github.sangeeeee.tlm_shogi.engine.CancellationToken";
     private static final String PROMOTE_SCREEN = "com.github.sangeeeee.tlm_shogi.client.gui.game.JChessPromoteScreen";
     private static final String PROMOTE_RESULT = "com.github.sangeeeee.tlm_shogi.network.message.JChessPromoteResultPackage";
@@ -51,7 +66,7 @@ public final class ShogiCompat {
     /** 引擎资源目录（在 tlm_shogi jar 内的 classpath 路径） */
     private static final String RESOURCE_DIR = "assets/tlm_shogi/sunfish";
 
-    /** 手驹点击区域起点/格距（逆推自 JChessUtil.getClickPosition 字节码：0.512/0.1167、0.157/0.1096） */
+    /** 手驹点击区域起点格点号（0~80 棋盘、81~89 手驹） */
     private static final int HAND_POINT_BASE = 81;
 
     // ---- 探测结果（懒加载、只探测一次） ----
@@ -61,7 +76,6 @@ public final class ShogiCompat {
     private static Class<?> teClass;
     private static Class<?> blockClass;
     private static Class<?> positionClass;
-    private static Class<?> positionUtilClass;
     private static Class<?> partClass;
     private static Class<?> promoteScreenClass;
     private static Class<?> promoteResultClass;
@@ -69,12 +83,14 @@ public final class ShogiCompat {
     private static Property<?> facingProperty;
 
     private static Method getChessDataMethod;
-    private static Method positionToUsiMethod;
-    private static Method usiToPosMethod;
-    private static Method pieceCharToIdMethod;
+    private static Method positionToSfenMethod;
+    private static Method squareParseSfenMethod;
+    private static Method pointFromSquareMethod;
+    private static Method handIndexMethod;
+    private static Object turnBlack;
+    private static Class<?> pieceTypeClass;
     private static Method partGetPosXMethod;
     private static Method partGetPosYMethod;
-    private static Field blackHandField;
 
     private static Method teIsPlayerTurnMethod;
     private static Method teIsCheckmateMethod;
@@ -83,6 +99,7 @@ public final class ShogiCompat {
     private static Method teGetChessCounterMethod;
 
     private static Field screenChessPosField;
+    private static Field screenExpectedSfenField;
     private static Field screenFromPosField;
     private static Field screenToPosField;
     private static Constructor<?> promoteResultCtor;
@@ -119,26 +136,31 @@ public final class ShogiCompat {
             return;
         }
         probed = true;
+        ClassLoader loader = ShogiCompat.class.getClassLoader();
         try {
-            ClassLoader loader = ShogiCompat.class.getClassLoader();
-            teClass = Class.forName(TE_CLASS, false, loader);
-            blockClass = Class.forName(BLOCK_CLASS, false, loader);
-            positionClass = Class.forName(POSITION_CLASS, false, loader);
-            positionUtilClass = Class.forName(POSITION_UTIL_CLASS, false, loader);
-            partClass = Class.forName(PART_CLASS, false, loader);
-            promoteScreenClass = Class.forName(PROMOTE_SCREEN, false, loader);
-            promoteResultClass = Class.forName(PROMOTE_RESULT, false, loader);
+            teClass = findClass(loader, TE_CLASS);
+            blockClass = findClass(loader, BLOCK_CLASS);
+            partClass = findClass(loader, PART_CLASS);
+            positionClass = findClass(loader, POSITION_CLASSES);
+            promoteScreenClass = findClass(loader, PROMOTE_SCREEN);
+            promoteResultClass = findClass(loader, PROMOTE_RESULT);
+
+            // 必需类缺失：判定为未安装/不兼容，只警告一次并禁用将棋
+            if (teClass == null || blockClass == null || partClass == null || positionClass == null) {
+                Chuying.LOGGER.warn("[chuying] 未检测到 tlm_shogi（或版本不兼容），将棋代打已禁用");
+                return;
+            }
 
             partProperty = (Property<?>) blockClass.getField("PART").get(null);
             facingProperty = (Property<?>) blockClass.getField("FACING").get(null);
-
-            getChessDataMethod = teClass.getMethod("getChessData");
-            positionToUsiMethod = positionClass.getMethod("toUSI");
-            usiToPosMethod = positionUtilClass.getMethod("usiToPos", String.class);
-            pieceCharToIdMethod = positionUtilClass.getMethod("pieceCharToId", char.class, boolean.class);
             partGetPosXMethod = partClass.getMethod("getPosX");
             partGetPosYMethod = partClass.getMethod("getPosY");
-            blackHandField = positionClass.getField("blackHand");
+            getChessDataMethod = teClass.getMethod("getChessData");
+            // 正式版 toSfen()；beta 为 toUSI()
+            positionToSfenMethod = methodOrNull(positionClass, "toSfen");
+            if (positionToSfenMethod == null) {
+                positionToSfenMethod = methodOrNull(positionClass, "toUSI");
+            }
 
             teIsPlayerTurnMethod = teClass.getMethod("isPlayerTurn");
             teIsCheckmateMethod = teClass.getMethod("isCheckmate");
@@ -146,19 +168,84 @@ public final class ShogiCompat {
             teIsMoveNumberLimitMethod = teClass.getMethod("isMoveNumberLimit");
             teGetChessCounterMethod = teClass.getMethod("getChessCounter");
 
-            screenChessPosField = promoteScreenClass.getDeclaredField("chessPos");
-            screenFromPosField = promoteScreenClass.getDeclaredField("fromPos");
-            screenToPosField = promoteScreenClass.getDeclaredField("toPos");
-            screenChessPosField.setAccessible(true);
-            screenFromPosField.setAccessible(true);
-            screenToPosField.setAccessible(true);
-            promoteResultCtor = promoteResultClass.getConstructor(BlockPos.class, int.class, int.class, int.class);
+            bindPromote(loader);
+            bindCoordinates(loader);
 
             available = true;
             Chuying.LOGGER.info("[chuying] 检测到 tlm_shogi，将棋代打已启用");
         } catch (Throwable t) {
             available = false;
             Chuying.LOGGER.warn("[chuying] 未检测到 tlm_shogi（或版本不兼容），将棋代打已禁用：{}", t.toString());
+        }
+    }
+
+    /** 升变自动应答相关（正式版与 beta 结构不同，找不到就只打日志不崩） */
+    private static void bindPromote(ClassLoader loader) {
+        try {
+            screenChessPosField = promoteScreenClass.getDeclaredField("chessPos");
+            screenChessPosField.setAccessible(true);
+            screenFromPosField = promoteScreenClass.getDeclaredField("fromPos");
+            screenFromPosField.setAccessible(true);
+            screenToPosField = promoteScreenClass.getDeclaredField("toPos");
+            screenToPosField.setAccessible(true);
+            // 正式版新增 expectedSfen 字段与网络包参数
+            screenExpectedSfenField = fieldOrNull(promoteScreenClass, "expectedSfen");
+            if (screenExpectedSfenField != null) {
+                screenExpectedSfenField.setAccessible(true);
+                promoteResultCtor = promoteResultClass.getConstructor(
+                        BlockPos.class, String.class, int.class, int.class, int.class);
+            } else {
+                promoteResultCtor = promoteResultClass.getConstructor(
+                        BlockPos.class, int.class, int.class, int.class);
+            }
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying] 将棋升变界面结构不兼容，升变时应答会跳过：{}", t.toString());
+        }
+    }
+
+    /** 坐标/手驹换算相关（正式版在 JChessUiAdapter + Square） */
+    private static void bindCoordinates(ClassLoader loader) {
+        try {
+            Class<?> squareClass = findClass(loader, SQUARE_CLASS);
+            Class<?> uiAdapterClass = findClass(loader, UI_ADAPTER_CLASS);
+            Class<?> turnClass = findClass(loader, TURN_CLASS);
+            pieceTypeClass = findClass(loader, PIECE_TYPE_CLASS);
+            if (squareClass == null || uiAdapterClass == null || pieceTypeClass == null) {
+                return;
+            }
+            squareParseSfenMethod = squareClass.getMethod("parseSfen", String.class);
+            pointFromSquareMethod = uiAdapterClass.getMethod("pointFromSquare", squareClass);
+            handIndexMethod = uiAdapterClass.getMethod("handIndex", positionClass, turnClass, pieceTypeClass);
+            turnBlack = turnClass.getField("BLACK").get(null);
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying] 将棋坐标换算接口不兼容：{}", t.toString());
+        }
+    }
+
+    private static Class<?> findClass(ClassLoader loader, String... names) {
+        for (String name : names) {
+            try {
+                return Class.forName(name, false, loader);
+            } catch (Throwable ignored) {
+                // 该类不存在：继续尝试下一个候选名
+            }
+        }
+        return null;
+    }
+
+    private static Method methodOrNull(Class<?> owner, String name, Class<?>... params) {
+        try {
+            return owner.getMethod(name, params);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static Field fieldOrNull(Class<?> owner, String name) {
+        try {
+            return owner.getDeclaredField(name);
+        } catch (Throwable t) {
+            return null;
         }
     }
 
@@ -202,8 +289,11 @@ public final class ShogiCompat {
     // ---- 棋盘状态读取（主线程调用） ----
 
     public static String sfenOf(Object te) {
+        if (positionToSfenMethod == null) {
+            return null;
+        }
         try {
-            return (String) positionToUsiMethod.invoke(getChessDataMethod.invoke(te));
+            return (String) positionToSfenMethod.invoke(getChessDataMethod.invoke(te));
         } catch (Throwable t) {
             return null;
         }
@@ -230,6 +320,9 @@ public final class ShogiCompat {
     }
 
     private static Object callQuietly(Method m, Object target, Object fallback) {
+        if (m == null) {
+            return fallback;
+        }
         try {
             return m.invoke(target);
         } catch (Throwable t) {
@@ -241,8 +334,16 @@ public final class ShogiCompat {
 
     /** USI 两字符格（如 "7f"）→ TLM 格点号（0~80 棋盘），失败返回 -1 */
     public static int usiSquareToPoint(String square) {
+        if (squareParseSfenMethod == null || pointFromSquareMethod == null) {
+            return -1;
+        }
         try {
-            return (int) usiToPosMethod.invoke(null, square);
+            Object parsed = squareParseSfenMethod.invoke(null, square);
+            Object sq = parsed instanceof Optional<?> opt ? opt.orElse(null) : parsed;
+            if (sq == null) {
+                return -1;
+            }
+            return (int) pointFromSquareMethod.invoke(null, sq);
         } catch (Throwable t) {
             return -1;
         }
@@ -253,22 +354,40 @@ public final class ShogiCompat {
      * 返回对应的点击格点号（81 + 槽位下标）；找不到返回 -1。
      */
     public static int dropPoint(Object te, char pieceChar) {
+        if (handIndexMethod == null || turnBlack == null) {
+            return -1;
+        }
         try {
-            int pieceId = (int) pieceCharToIdMethod.invoke(null, Character.toUpperCase(pieceChar), true);
-            if (pieceId < 0) {
+            Object pieceType = resolvePieceType(pieceChar);
+            if (pieceType == null) {
                 return -1;
             }
             Object position = getChessDataMethod.invoke(te);
-            List<?> hand = (List<?>) blackHandField.get(position);
-            for (int i = 0; i < hand.size(); i++) {
-                int[] entry = (int[]) hand.get(i);
-                if (entry[1] == pieceId) {
-                    return HAND_POINT_BASE + i;
-                }
-            }
-            return -1;
+            int idx = (int) handIndexMethod.invoke(null, position, turnBlack, pieceType);
+            return idx < 0 ? -1 : HAND_POINT_BASE + idx;
         } catch (Throwable t) {
             return -1;
+        }
+    }
+
+    private static Object resolvePieceType(char pieceChar) {
+        String fieldName = switch (Character.toUpperCase(pieceChar)) {
+            case 'P' -> "PAWN";
+            case 'L' -> "LANCE";
+            case 'N' -> "KNIGHT";
+            case 'S' -> "SILVER";
+            case 'G' -> "GOLD";
+            case 'B' -> "BISHOP";
+            case 'R' -> "ROOK";
+            default -> null;
+        };
+        if (fieldName == null || pieceTypeClass == null) {
+            return null;
+        }
+        try {
+            return pieceTypeClass.getField(fieldName).get(null);
+        } catch (Throwable t) {
+            return null;
         }
     }
 
@@ -365,6 +484,7 @@ public final class ShogiCompat {
                 Class<?> engineClass = Class.forName(SUNFISH_ENGINE, false, loader);
                 Class<?> limitsClass = Class.forName(SEARCH_LIMITS, false, loader);
                 Class<?> requestClass = Class.forName(SEARCH_REQUEST, false, loader);
+                Class<?> resultClass = Class.forName(SEARCH_RESULT, false, loader);
                 Class<?> tokenClass = Class.forName(CANCELLATION_TOKEN, false, loader);
 
                 searchLimitsCtor = limitsClass.getConstructor(Duration.class, int.class, long.class, int.class, int.class);
@@ -372,8 +492,6 @@ public final class ShogiCompat {
                 cancellationNone = tokenClass.getField("NONE").get(null);
                 engineInitializeMethod = engineClass.getMethod("initialize");
                 engineSearchMethod = engineClass.getMethod("search", requestClass, tokenClass);
-
-                Class<?> resultClass = Class.forName("com.github.sangeeeee.tlm_shogi.engine.SearchResult", false, loader);
                 resultBestMoveMethod = resultClass.getMethod("bestMove");
                 resultOutcomeMethod = resultClass.getMethod("outcome");
 
@@ -398,7 +516,7 @@ public final class ShogiCompat {
      * 否则什么都不做。必须在主线程（客户端 tick）调用。
      */
     public static void autoAnswerPromote(Minecraft mc) {
-        if (!isAvailable() || mc == null) {
+        if (!isAvailable() || mc == null || promoteScreenClass == null) {
             return;
         }
         Screen screen = mc.screen;
@@ -411,7 +529,13 @@ public final class ShogiCompat {
             int toPos = screenToPosField.getInt(screen);
             // choice：1=升变、2=不升变（0=取消，服务器忽略）
             int choice = pendingPromote ? 1 : 2;
-            Object payload = promoteResultCtor.newInstance(chessPos, fromPos, toPos, choice);
+            Object payload;
+            if (screenExpectedSfenField != null) {
+                String expectedSfen = (String) screenExpectedSfenField.get(screen);
+                payload = promoteResultCtor.newInstance(chessPos, expectedSfen, fromPos, toPos, choice);
+            } else {
+                payload = promoteResultCtor.newInstance(chessPos, fromPos, toPos, choice);
+            }
             PacketDistributor.sendToServer((CustomPacketPayload) payload);
             mc.setScreen(null);
             Chuying.LOGGER.info("[chuying] 将棋升变自动应答：from={} to={} promote={}", fromPos, toPos, pendingPromote);
