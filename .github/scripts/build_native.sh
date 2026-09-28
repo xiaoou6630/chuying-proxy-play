@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build the chuying JNI native engine libraries on CI (one lib per engine).
-# Steps: clone engine sources -> rename main() -> link as static libs into
-# chuying_<engine> shared libs alongside the bridge. No OS process involved.
+# Steps: clone engine sources -> rename main() -> compile sources directly
+# into chuying_<engine> shared libs alongside the bridge (no engine CMake).
+# No OS process is spawned; engines run in-process via redirected streams.
 # Usage: bash .github/scripts/build_native.sh <windows|linux|macos>
 set -euo pipefail
 
@@ -33,19 +34,8 @@ PF_SHA=$(git_clone https://github.com/official-pikafish/Pikafish.git  "$ENGINES/
 RF_SHA=$(git_clone https://github.com/dhbloo/rapfi.git                "$ENGINES/rapfi"      250615    | awk '{print $NF}')
 
 # ---------------------------------------------------------------------------
-# 2. Patch: add_executable -> add_library STATIC (link engines into our libs)
-# ---------------------------------------------------------------------------
-log "patching CMakeLists (add_executable -> add_library STATIC)"
-find "$ENGINES" -name CMakeLists.txt | while read -r f; do
-    if grep -q 'add_executable(' "$f"; then
-        sed -i 's/add_executable(\([A-Za-z0-9_.-]*\)/add_library(\1 STATIC/g' "$f"
-        echo "patched: $f"
-    fi
-done
-
-# ---------------------------------------------------------------------------
-# 3. Patch: int main(...) -> engine_main(...) so the engine can run in-thread.
-#    Rapfi builds two mains (piskvork + pbrain): we keep the pbrain one.
+# 2. Patch: int main(...) -> engine_main(...) so the engine can run in-thread.
+#    Pikafish keeps extra universal-entry mains -> disable them.
 # ---------------------------------------------------------------------------
 rename_mains() { # dir want_substring
     local dir="$1" want="$2" files=() f assigned=0
@@ -75,45 +65,16 @@ rename_mains() { # dir want_substring
     [ "$assigned" -eq 1 ] || { log "ERROR: no main() patched in $dir"; exit 1; }
 }
 
-rename_mains "$ENGINES/stockfish" main
-rename_mains "$ENGINES/pikafish"  main
-rename_mains "$ENGINES/rapfi"     pbrain
+rename_mains "$ENGINES/stockfish/src" main
+rename_mains "$ENGINES/pikafish/src"  main.cpp
+rename_mains "$ENGINES/rapfi/Rapfi"   pbrain
 
 # ---------------------------------------------------------------------------
-# 4. Extract target names from patched CMakeLists into gen_targets.cmake
-# ---------------------------------------------------------------------------
-pick_target() { # dir prefer
-    local all t hit=""
-    all=$(find "$1" -name CMakeLists.txt -exec grep -hoE 'add_library\([A-Za-z0-9_.-]+ STATIC' {} + \
-        | sed 's/add_library(//;s/ STATIC//' | sort -u)
-    [ -n "$all" ] || { log "ERROR: no STATIC targets found in $1"; exit 1; }
-    for t in $all; do
-        case "$t" in *"$2"*) hit="$t"; break ;; esac
-    done
-    [ -n "$hit" ] || hit=$(echo "$all" | head -1)
-    echo "$hit"
-}
-
-cat > native/gen_targets.cmake <<EOF
-set(SF_TARGET "$(pick_target "$ENGINES/stockfish" stockfish)")
-set(PF_TARGET "$(pick_target "$ENGINES/pikafish"  pikafish)")
-set(RF_TARGET "$(pick_target "$ENGINES/rapfi"     pbrain)")
-EOF
-log "targets: $(tr '\n' ' ' < native/gen_targets.cmake)"
-
-# ---------------------------------------------------------------------------
-# 5. CMake configure + build
+# 3. CMake configure + build (engine sources globbed by native/CMakeLists.txt)
 # ---------------------------------------------------------------------------
 CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
 if [ "$PLATFORM" = "macos" ]; then
-    # clang has no built-in OpenMP; rapfi links it. Homebrew libomp on arm64 runner.
-    brew list libomp >/dev/null 2>&1 || brew install libomp
-    OMP_PREFIX="$(brew --prefix libomp)"
-    CMAKE_ARGS+=(
-        -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp -I${OMP_PREFIX}/include"
-        -DOpenMP_CXX_LIB_NAMES=omp
-        -DOpenMP_omp_LIBRARY="${OMP_PREFIX}/lib/libomp.dylib"
-    )
+    CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=arm64)
 fi
 
 log "cmake configure: ${CMAKE_ARGS[*]}"
@@ -125,7 +86,7 @@ case "$PLATFORM" in
 esac
 
 # ---------------------------------------------------------------------------
-# 6. Collect outputs + GPL build info
+# 4. Collect outputs + GPL build info
 # ---------------------------------------------------------------------------
 case "$PLATFORM" in
     windows) find native/build -name 'chuying_*.dll'   -exec cp {} native/dist/ \; ;;

@@ -1,9 +1,13 @@
 # chuying native engines: JNI bridge + Stockfish/Pikafish/Rapfi linked in-process.
 # CI clones engine sources into native/engines/<name> and patches their
 # main() -> engine_main() before configuring this project (see
-# .github/scripts/build_native.sh). gen_targets.cmake is generated there too.
+# .github/scripts/build_native.sh).
+#
+# We do NOT use the engines' own CMake targets (Stockfish ships no
+# add_executable, Rapfi's target names vary). Engine sources are globbed
+# directly: correctness first (scalar/SSE2 baseline), arch tuning later.
 cmake_minimum_required(VERSION 3.16)
-project(chuying_native CXX)
+project(chuying_native C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +15,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded") # static CRT: keep iostream state per-DLL
-    add_compile_options(/utf-8 /EHsc /Zc:__cplusplus)
+    add_compile_options(/utf-8 /EHsc)
+else()
+    find_package(Threads REQUIRED)
+    link_libraries(Threads::Threads)
 endif()
 
 # JNI headers (JAVA_HOME provided by actions/setup-java)
@@ -24,24 +31,37 @@ else()
 endif()
 include_directories("$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
 
-include(${CMAKE_CURRENT_LIST_DIR}/gen_targets.cmake)
+# ---------------------------------------------------------------------------
+# Engine sources (main.cpp already patched to engine_main by CI script)
+# ---------------------------------------------------------------------------
+file(GLOB_RECURSE SF_SRCS CONFIGURE_DEPENDS engines/stockfish/src/*.cpp)
+file(GLOB_RECURSE PF_SRCS CONFIGURE_DEPENDS engines/pikafish/src/*.cpp)
+list(FILTER PF_SRCS EXCLUDE REGEX "pikafish/src/universal/")
 
-macro(chuying_bridge name engine_target)
+file(GLOB_RECURSE RF_SRCS CONFIGURE_DEPENDS engines/rapfi/Rapfi/src/*.cpp)
+list(APPEND RF_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/main.cpp)
+file(GLOB RF_LZ4 CONFIGURE_DEPENDS engines/rapfi/Rapfi/lz4/*.c)
+
+function(chuying_bridge name)
+    cmake_parse_arguments(ARG "" "" "SOURCES;INCLUDES" ${ARGN})
     add_library(${name} SHARED
         ${CMAKE_CURRENT_LIST_DIR}/src/uci_bridge.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/src/jni_exports.cpp)
-    target_link_libraries(${name} PRIVATE ${engine_target})
+        ${CMAKE_CURRENT_LIST_DIR}/src/jni_exports.cpp
+        ${ARG_SOURCES})
+    target_include_directories(${name} PRIVATE ${ARG_INCLUDES})
     set_target_properties(${name} PROPERTIES PREFIX "")
-endmacro()
+endfunction()
 
-# Stockfish (chess) - CMakeLists lives in src/
-add_subdirectory(engines/stockfish/src  sf_build)
-chuying_bridge(chuying_stockfish ${SF_TARGET})
+chuying_bridge(chuying_stockfish
+    SOURCES ${SF_SRCS}
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/stockfish/src)
 
-# Pikafish (xiangqi) - same layout as Stockfish
-add_subdirectory(engines/pikafish/src  pf_build)
-chuying_bridge(chuying_pikafish ${PF_TARGET})
+chuying_bridge(chuying_pikafish
+    SOURCES ${PF_SRCS}
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
 
-# Rapfi (gomoku, pbrain protocol) - CMakeLists at repo root
-add_subdirectory(engines/rapfi  rf_build)
-chuying_bridge(chuying_rapfi ${RF_TARGET})
+chuying_bridge(chuying_rapfi
+    SOURCES ${RF_SRCS} ${RF_LZ4}
+    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/src
+             ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi
+             ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/lz4)
