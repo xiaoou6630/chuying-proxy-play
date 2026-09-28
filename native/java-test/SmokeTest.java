@@ -43,7 +43,11 @@ public class SmokeTest {
             // Real search: handshake alone passes even when NNUE eval is broken,
             // which is exactly how a crashing build slipped through before.
             if (ok) {
-                bridge.send("position startpos moves e2e4 e7e5");
+                // Xiangqi (Pikafish) and chess (Stockfish) use different move notation.
+                String moves = "pikafish".equals(engine)
+                        ? "position startpos moves h2e2"   // 炮二平五
+                        : "position startpos moves e2e4";
+                bridge.send(moves);
                 bridge.send("go depth 4");
                 ok = expectPrefix(bridge, "bestmove", 120000);
             }
