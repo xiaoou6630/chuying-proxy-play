@@ -19,21 +19,6 @@ public final class Config {
             .comment("总开关：默认开启；真正的启停用快捷键 K。")
             .define("enabled", true);
 
-    /** 中国象棋 UCI 引擎（皮卡鱼等）路径，空 = 禁用 */
-    public static final ModConfigSpec.ConfigValue<String> CCHESS_ENGINE = BUILDER
-            .comment("中国象棋 UCI 引擎路径（如 pikafish.exe），留空 = 禁用。")
-            .define("cchessEnginePath", "");
-
-    /** 国际象棋 UCI 引擎（Stockfish 等）路径，空 = 禁用 */
-    public static final ModConfigSpec.ConfigValue<String> WCHESS_ENGINE = BUILDER
-            .comment("国际象棋 UCI 引擎路径（如 stockfish.exe），留空 = 禁用。")
-            .define("wchessEnginePath", "");
-
-    /** 五子棋引擎（Rapfi 等）路径，空 = 禁用 */
-    public static final ModConfigSpec.ConfigValue<String> GOMOKU_ENGINE = BUILDER
-            .comment("五子棋引擎路径（如 rapfi.exe），留空 = 禁用。")
-            .define("gomokuEnginePath", "");
-
     /** 每步思考时间（毫秒） */
     public static final ModConfigSpec.IntValue THINK_TIME = BUILDER
             .comment("每步思考时间（毫秒）。")

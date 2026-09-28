@@ -5,48 +5,59 @@ import net.minecraft.client.Minecraft;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.stream.Stream;
 
 /**
- * 把打包在 jar 里的内置引擎（Windows / Linux / macOS 三平台）首次运行时解压到
- * {@code config/chuying/engines/}。
+ * 把打包在 jar 里的原生引擎库与权重数据首次运行时解压到 {@code config/chuying/engines/}。
  * <p>
+ * 2.0 起引擎为 JNI 原生库（零子进程），jar 内允许直接携带 .dll/.so/.dylib。
  * 目录结构（jar 内）：
  * <pre>
  * engines/
- * ├── shared/                     # 三平台通用资源（只打包一份，运行时复制到平台目录）
- * │   ├── pikafish.nnue
- * │   └── rapfi/                  # config + 模型（Rapfi 要求与 exe 同目录，解压时复制过去）
- * └── windows|linux|macos/        # 当前平台的可执行文件（统一无扩展名！）
- *     ├── pikafish                # CurseForge 禁止 jar 内含 .exe/.sh/.bat，
- *     ├── stockfish               # 故 jar 内一律不带后缀，
- *     └── rapfi/pbrain-rapfi      # Windows 下解压时再补回 .exe
+ * ├── shared/                          # 三平台通用权重（只打包一份）
+ * │   ├── pikafish.nnue                # 皮卡鱼权重
+ * │   ├── stockfish/                   # Stockfish 两份 NNUE（EvalFile / EvalFileSmall）
+ * │   └── rapfi/                       # config.toml 模板 + 模型（config 内模型路径解压时改写为绝对路径）
+ * └── windows|linux|macos/             # 当前平台的原生库（带平台后缀）
+ *     ├── chuying_stockfish.dll|so|dylib
+ *     ├── chuying_pikafish.dll|so|dylib
+ *     └── chuying_rapfi.dll|so|dylib
  * </pre>
- * <p>
- * 解压规则：文件不存在才解压（已存在说明用户可能自行替换过，尊重用户文件）。
+ * 解压规则：库与权重文件不存在才解压（已存在视为用户可能自行替换过，尊重用户文件）；
+ * rapfi config.toml 因内含本机绝对路径，每次解压都重新生成。
  */
 public final class EngineExtractor {
     private static final String SUB_DIR = "config/chuying/engines";
-    /** 三平台通用资源（jar 内路径，带 engines/ 前缀） */
+    /** 当前平台原生库后缀 */
+    private static final String LIB_EXT = switch (platformRaw()) {
+        case "windows" -> ".dll";
+        case "macos" -> ".dylib";
+        default -> ".so";
+    };
+    /** 三平台通用权重/模型（jar 内路径，带 engines/ 前缀） */
     private static final List<String> SHARED_RESOURCES = List.of(
             "engines/shared/pikafish.nnue",
+            "engines/shared/stockfish/nn-1c0000000000.nnue",
+            "engines/shared/stockfish/nn-37f18f62d772.nnue",
             "engines/shared/rapfi/config.toml",
             "engines/shared/rapfi/model210901.bin",
             "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4"
     );
-    /** 各平台可执行文件（jar 内相对路径，不含后缀，enginePath() 会补 .exe） */
-    private static final List<String> EXECUTABLES = List.of(
-            "pikafish",
-            "stockfish",
-            "rapfi/pbrain-rapfi"
+    /** 三个原生引擎库名（不含平台后缀） */
+    private static final List<String> NATIVE_LIBS = List.of(
+            "chuying_stockfish",
+            "chuying_pikafish",
+            "chuying_rapfi"
+    );
+    /** Rapfi config.toml 中需要改写为绝对路径的模型文件 */
+    private static final List<String> RAPFI_MODEL_FILES = List.of(
+            "model210901.bin",
+            "mix9svqfreestyle_bsmix.bin.lz4"
     );
 
     private static Path enginesDir;
@@ -54,8 +65,7 @@ public final class EngineExtractor {
     private EngineExtractor() {
     }
 
-    /** 当前运行平台：windows / linux / macos */
-    public static String platform() {
+    private static String platformRaw() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (os.contains("win")) {
             return "windows";
@@ -66,8 +76,9 @@ public final class EngineExtractor {
         return "linux";
     }
 
-    private static boolean isWindows() {
-        return "windows".equals(platform());
+    /** 当前运行平台：windows / linux / macos */
+    public static String platform() {
+        return platformRaw();
     }
 
     public static synchronized Path enginesDir() {
@@ -81,13 +92,26 @@ public final class EngineExtractor {
     }
 
     /**
-     * 返回 jar 内某个引擎可执行文件解压后的绝对路径，未解压成功返回 null。
-     * {@code rel} 为平台目录内的相对路径（如 "pikafish" / "stockfish" / "rapfi/pbrain-rapfi"），
-     * Windows 下自动补 .exe 后缀。
+     * 返回原生引擎库解压后的绝对路径，未找到返回 null。
+     * {@code name} 为库的基名（如 "chuying_pikafish"），平台后缀自动补全。
      */
-    public static String enginePath(String rel) {
-        String file = rel + (isWindows() ? ".exe" : "");
-        Path target = enginesDir().resolve(platform()).resolve(file.replace('/', java.io.File.separatorChar));
+    public static String nativeLibPath(String name) {
+        Path target = enginesDir().resolve(platform()).resolve(name + LIB_EXT);
+        return Files.exists(target) ? target.toString() : null;
+    }
+
+    /**
+     * 返回平台目录下数据文件（权重/模型）的绝对路径，未找到返回 null。
+     * {@code rel} 为平台目录内相对路径（如 "pikafish.nnue"、"stockfish/nn-1c0000000000.nnue"）。
+     */
+    public static String dataFilePath(String rel) {
+        Path target = enginesDir().resolve(platform()).resolve(rel.replace('/', java.io.File.separatorChar));
+        return Files.exists(target) ? target.toString() : null;
+    }
+
+    /** Rapfi 的 config.toml 解压后路径（模型路径已改写为绝对路径），未就绪返回 null */
+    public static String rapfiConfigPath() {
+        Path target = enginesDir().resolve(platform()).resolve("rapfi").resolve("config.toml");
         return Files.exists(target) ? target.toString() : null;
     }
 
@@ -95,38 +119,28 @@ public final class EngineExtractor {
         Path sharedDir = dir.resolve("shared");
         Path platDir = dir.resolve(platform());
 
-        // 传入各自目录前缀，去掉后才 resolve 到对应目录，避免 engines/shared/shared 双重目录
         extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/", false);
-        extractResources(platformResources(), platDir, "engines/" + platform() + "/", true);
+        extractResources(nativeLibResources(), platDir, "engines/" + platform() + "/", false);
         copySharedToPlatform(sharedDir, platDir);
-        makeExecutable(platDir);
     }
 
-    /** 当前平台的资源清单（jar 内统一无 .exe 后缀，Windows 下解压时补回） */
-    private static List<String> platformResources() {
-        String plat = platform();
-        return List.of(
-                "engines/" + plat + "/pikafish",
-                "engines/" + plat + "/stockfish",
-                "engines/" + plat + "/rapfi/pbrain-rapfi"
-        );
+    /** 当前平台原生库资源清单（jar 内直接带平台后缀） */
+    private static List<String> nativeLibResources() {
+        return NATIVE_LIBS.stream()
+                .map(name -> "engines/" + platform() + "/" + name + LIB_EXT)
+                .toList();
     }
 
     /**
      * 解压资源到目标目录。
-     * {@code prefix} 是 jar 内资源的前缀（含 engines/ 与平台/shared 段），
+     * {@code prefix} 是 jar 内资源前缀（含 engines/ 与平台/shared 段），
      * 剥离后剩余的相对路径再 resolve 到 {@code targetRoot}。
-     * {@code appendExeOnWindows} 为 true 时，Windows 下解压文件名补回 .exe 后缀
-     * （jar 内禁止含可执行文件，见 build.gradle 的 rename）。
      */
-    private static void extractResources(List<String> resources, Path targetRoot, String prefix, boolean appendExeOnWindows) {
+    private static void extractResources(List<String> resources, Path targetRoot, String prefix, boolean replace) {
         for (String res : resources) {
             String rel = res.substring(prefix.length());
             Path target = targetRoot.resolve(rel.replace('/', java.io.File.separatorChar));
-            if (appendExeOnWindows && isWindows()) {
-                target = target.resolveSibling(target.getFileName() + ".exe");
-            }
-            if (Files.exists(target)) {
+            if (!replace && Files.exists(target)) {
                 continue;
             }
             try (InputStream in = EngineExtractor.class.getResourceAsStream("/" + res)) {
@@ -136,29 +150,68 @@ public final class EngineExtractor {
                 }
                 Files.createDirectories(target.getParent());
                 Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
-                Chuying.LOGGER.info("解压内置引擎: {}", target);
+                Chuying.LOGGER.info("解压内置引擎资源: {}", target);
             } catch (IOException e) {
-                Chuying.LOGGER.error("解压引擎失败: {}", res, e);
+                Chuying.LOGGER.error("解压引擎资源失败: {}", res, e);
             }
         }
     }
 
     /**
      * 把 shared 里的通用依赖复制到平台目录：
-     * - pikafish.nnue → 平台目录（Pikafish 按 exe 旁同名 .nnue 自动加载）
-     * - rapfi/* → 平台目录/rapfi/（Rapfi 自动检测 config.toml 与模型）
+     * - pikafish.nnue → 平台目录根（EvalFile 指向）
+     * - stockfish/*.nnue → 平台目录/stockfish/
+     * - rapfi/* → 平台目录/rapfi/（config.toml 重新生成，模型路径改写为绝对路径）
      */
     private static void copySharedToPlatform(Path sharedDir, Path platDir) {
         copyIfAbsent(sharedDir.resolve("pikafish.nnue"), platDir.resolve("pikafish.nnue"));
+        Path sharedSf = sharedDir.resolve("stockfish");
+        if (Files.isDirectory(sharedSf)) {
+            try (var files = Files.list(sharedSf)) {
+                Path sfDir = platDir.resolve("stockfish");
+                Files.createDirectories(sfDir);
+                files.forEach(f -> copyIfAbsent(f, sfDir.resolve(f.getFileName().toString())));
+            } catch (IOException e) {
+                Chuying.LOGGER.error("复制 Stockfish 权重失败", e);
+            }
+        }
         Path sharedRapfi = sharedDir.resolve("rapfi");
-        Path platRapfi = platDir.resolve("rapfi");
         if (!Files.isDirectory(sharedRapfi)) {
             return;
         }
-        try (Stream<Path> files = Files.list(sharedRapfi)) {
-            files.forEach(f -> copyIfAbsent(f, platRapfi.resolve(f.getFileName().toString())));
+        try (var files = Files.list(sharedRapfi)) {
+            Path rapfiDir = platDir.resolve("rapfi");
+            Files.createDirectories(rapfiDir);
+            files.forEach(f -> {
+                String name = f.getFileName().toString();
+                if (name.equals("config.toml")) {
+                    writeRapfiConfig(f, rapfiDir.resolve(name), rapfiDir);
+                } else {
+                    copyIfAbsent(f, rapfiDir.resolve(name));
+                }
+            });
         } catch (IOException e) {
             Chuying.LOGGER.error("复制共享 Rapfi 资源失败", e);
+        }
+    }
+
+    /**
+     * 生成 Rapfi 的 config.toml：以 shared 模板为底，把模型文件的相对路径改写为本机绝对路径。
+     * （Rapfi 只按 cwd 与 binaryDirectory 搜索模型，进程内模式下二者都不是引擎目录，故必须绝对路径。）
+     * 每次解压都重新生成，避免游戏目录迁移后残留旧路径。
+     */
+    private static void writeRapfiConfig(Path template, Path target, Path rapfiDir) {
+        try {
+            String content = Files.readString(template, StandardCharsets.UTF_8);
+            for (String model : RAPFI_MODEL_FILES) {
+                content = content.replace("\"" + model + "\"",
+                        "\"" + rapfiDir.resolve(model).toString().replace('\\', '/') + "\"");
+            }
+            Files.createDirectories(target.getParent());
+            Files.writeString(target, content, StandardCharsets.UTF_8, StandardCopyOption.REPLACE_EXISTING);
+            Chuying.LOGGER.info("生成 Rapfi 配置: {}", target);
+        } catch (IOException e) {
+            Chuying.LOGGER.error("生成 Rapfi 配置失败: {}", target, e);
         }
     }
 
@@ -171,25 +224,6 @@ public final class EngineExtractor {
             Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             Chuying.LOGGER.error("复制引擎资源失败: {} -> {}", src, dst, e);
-        }
-    }
-
-    /** Linux/macOS 需要可执行权限；Windows 无此概念 */
-    private static void makeExecutable(Path platDir) {
-        if (isWindows()) {
-            return;
-        }
-        Set<PosixFilePermission> perms = EnumSet.of(
-                PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
-                PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_EXECUTE,
-                PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE
-        );
-        for (String name : EXECUTABLES) {
-            try {
-                Files.setPosixFilePermissions(platDir.resolve(name), perms);
-            } catch (IOException | UnsupportedOperationException e) {
-                Chuying.LOGGER.warn("设置引擎执行权限失败: {}", name);
-            }
         }
     }
 }

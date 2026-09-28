@@ -4,8 +4,8 @@ import com.chuying.Chuying;
 import com.chuying.Config;
 import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
-import com.chuying.engine.PbrainGomokuEngine;
-import com.chuying.engine.UciEngine;
+import com.chuying.engine.NativeGomokuEngine;
+import com.chuying.engine.NativeUciEngine;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Point;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Statue;
 import com.github.tartaricacid.touhoulittlemaid.api.game.xqwlight.Position;
@@ -169,7 +169,7 @@ public class ProxyPlayClient {
         if (fen.equals(ProxyPlayState.lastFen)) {
             return;
         }
-        UciEngine engine = EngineManager.cchess();
+        NativeUciEngine engine = EngineManager.cchess();
         if (engine == null) {
             Chuying.LOGGER.warn("[chuying] cchess engine not available");
             noticeNoEngine("message.chuying.no_cchess_engine");
@@ -215,7 +215,7 @@ public class ProxyPlayClient {
         if (fen.equals(ProxyPlayState.lastFen)) {
             return;
         }
-        UciEngine engine = EngineManager.wchess();
+        NativeUciEngine engine = EngineManager.wchess();
         if (engine == null) {
             Chuying.LOGGER.warn("[chuying] wchess engine not available");
             noticeNoEngine("message.chuying.no_wchess_engine");
@@ -276,7 +276,7 @@ public class ProxyPlayClient {
         if (fp.equals(ProxyPlayState.lastFen)) {
             return;
         }
-        PbrainGomokuEngine engine = EngineManager.gomoku();
+        NativeGomokuEngine engine = EngineManager.gomoku();
         if (engine == null) {
             noticeNoEngine("message.chuying.no_gomoku_engine");
             return;
