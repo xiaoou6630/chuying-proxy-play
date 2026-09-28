@@ -157,7 +157,15 @@ void EngineBridge::engineThreadMain(std::vector<std::string> args) {
     argv.push_back(const_cast<char*>("chuying-engine"));
     for (auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
 
-    engine_main(static_cast<int>(argv.size()), argv.data());
+    // An uncaught C++ exception escaping this thread would call std::terminate
+    // and abort the whole JVM. Catch everything: the engine dies, the game lives.
+    try {
+        engine_main(static_cast<int>(argv.size()), argv.data());
+    } catch (const std::exception& e) {
+        std::cerr << "[chuying] engine terminated with exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[chuying] engine terminated with unknown exception" << std::endl;
+    }
 
     engineExited_.store(true);
     outCv_.notify_all();
