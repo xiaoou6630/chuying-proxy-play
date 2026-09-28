@@ -71,5 +71,7 @@ chuying_bridge(chuying_stockfish
 chuying_bridge(chuying_pikafish
     SOURCES ${PF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
+# Pikafish bundles zstd whose ASM fast-loop is an .S file not in our glob; disable it.
+target_compile_definitions(chuying_pikafish PRIVATE ZSTD_DISABLE_ASM)
 
 chuying_bridge(chuying_rapfi LIBS rapfi)

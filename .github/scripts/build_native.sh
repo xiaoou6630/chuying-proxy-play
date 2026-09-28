@@ -38,6 +38,15 @@ SF_SHA=$(git_clone https://github.com/official-stockfish/Stockfish.git "$ENGINES
 PF_SHA=$(git_clone https://github.com/official-pikafish/Pikafish.git  "$ENGINES/pikafish"  ""        | awk '{print $NF}')
 RF_SHA=$(git_clone https://github.com/dhbloo/rapfi.git                "$ENGINES/rapfi"      250615    | awk '{print $NF}')
 
+# Stockfish embeds its NNUE nets at compile time (INCBIN); fetch them.
+# Without them clang hard-errors and the engine cannot evaluate anyway.
+log "downloading stockfish NNUE nets"
+for net in $(grep -rhoE 'nn-[0-9a-f]{12}\.nnue' "$ENGINES/stockfish/src" | sort -u); do
+    curl -fsSL "https://tests.stockfishchess.org/api/nn/$net" -o "$ENGINES/stockfish/src/$net"
+    echo "$net $(stat -c%s "$ENGINES/stockfish/src/$net" 2>/dev/null || wc -c < "$ENGINES/stockfish/src/$net") bytes"
+done
+ls -la "$ENGINES/stockfish/src/"*.nnue
+
 # ---------------------------------------------------------------------------
 # 2. Patch CMakeLists: add_executable -> add_library STATIC (Rapfi uses its
 #    own CMakeLists with bundled externals; Stockfish/Pikafish have none)
