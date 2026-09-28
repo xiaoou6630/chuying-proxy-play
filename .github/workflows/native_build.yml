@@ -54,6 +54,9 @@ jobs:
       - name: Build native engine libraries
         run: bash .github/scripts/build_native.sh ${{ matrix.platform }}
         shell: bash
+        env:
+          # 匿名 GitHub API 按 IP 限流，runner 共享 IP 常已被用光（403）；带 token 才稳
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Upload BEFORE smoke: artifacts survive smoke failures/hangs
       - name: Upload native libraries

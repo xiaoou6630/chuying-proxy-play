@@ -19,6 +19,17 @@ sed_inplace() {
     if sed --version >/dev/null 2>&1; then /usr/bin/sed -i "$@"; else /usr/bin/sed -i '' "$@"; fi
 }
 
+# Anonymous GitHub API calls are rate limited per IP; the shared runner IP is
+# often already exhausted, which showed up as "curl: (56) ... 403" while fetching
+# the Pikafish net and failed the whole build. Use the workflow token when present.
+api_curl() {
+    if [ -n "${GH_TOKEN:-}" ]; then
+        curl -fsSL --retry 3 --retry-delay 2 -H "Authorization: Bearer $GH_TOKEN" "$@"
+    else
+        curl -fsSL --retry 3 --retry-delay 2 "$@"
+    fi
+}
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -63,10 +74,10 @@ ls -la "$ENGINES/stockfish/src/"*.nnue
 # Pikafish embeds its net as src/pikafish.nnue (EvalFileDefaultName) and refuses to
 # start without it. No direct file URL exists, so take it from the release 7z.
 log "downloading pikafish NNUE net"
-PKF_URL="$(curl -fsSL https://api.github.com/repos/official-pikafish/Pikafish/releases/latest \
+PKF_URL="$(api_curl https://api.github.com/repos/official-pikafish/Pikafish/releases/latest \
   | grep -o '"browser_download_url": *"[^"]*\.7z"' | head -1 | sed 's/.*: *"//;s/"$//')"
 [ -n "$PKF_URL" ] || { log "ERROR: pikafish release url not found"; exit 1; }
-curl -fL -o "$TMP/pikafish.7z" "$PKF_URL"
+api_curl -L -o "$TMP/pikafish.7z" "$PKF_URL"
 extract_7z "$TMP/pikafish.7z" "$TMP/pkf"
 cp "$TMP/pkf/pikafish.nnue" "$ENGINES/pikafish/src/pikafish.nnue"
 ls -la "$ENGINES/pikafish/src/pikafish.nnue"
