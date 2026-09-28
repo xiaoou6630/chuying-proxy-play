@@ -20,10 +20,12 @@
 #include <thread>
 #include <vector>
 
-namespace chuying {
-
-// renamed entry point of the engine (patched by CI, see .github/scripts/build_native.sh)
+// Renamed entry point of the engine (patched by CI, see
+// .github/scripts/build_native.sh). Global C++ linkage: the engine's main.cpp
+// is plain global code, so the mangled name must match _Z11engine_mainiPPc.
 extern int engine_main(int argc, char* argv[]);
+
+namespace chuying {
 
 class EngineBridge {
 public:
