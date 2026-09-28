@@ -15,6 +15,7 @@
   "chuying.configuration.avoidDraw.ACTIVE": "積極的",
   "chuying.configuration.avoidDraw.AGGRESSIVE": "極限",
   "chuying.configuration.debugForceMaxMaid": "デバッグ：五目並べのメイドを最高難易度 HELL に強制",
+  "chuying.configuration.shogiEnabled": "将棋代打（tlm_shogi 拡張が必要）",
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "代打の切り替え",
@@ -23,5 +24,6 @@
   "message.chuying.no_cchess_engine": "褚嬴代打：中国将棋エンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンライブラリが見つからないか展開に失敗しました",
+  "message.chuying.no_shogi_engine": "褚嬴代打：将棋エンジンの初期化に失敗、または tlm_shogi 拡張がありません",
   "message.chuying.need_empty_hand": "褚嬴代打：手を空けてください（盤面は素手が必要）"
 }

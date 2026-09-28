@@ -15,6 +15,7 @@
   "chuying.configuration.avoidDraw.ACTIVE": "激进",
   "chuying.configuration.avoidDraw.AGGRESSIVE": "极致",
   "chuying.configuration.debugForceMaxMaid": "调试：强制五子棋女仆最高难度 HELL",
+  "chuying.configuration.shogiEnabled": "将棋代打（需 tlm_shogi 扩展）",
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "切换代打开关",
@@ -23,5 +24,6 @@
   "message.chuying.no_cchess_engine": "褚嬴代打：中国象棋引擎库缺失或解压失败",
   "message.chuying.no_wchess_engine": "褚嬴代打：国际象棋引擎库缺失或解压失败",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五子棋引擎库缺失或解压失败",
+  "message.chuying.no_shogi_engine": "褚嬴代打：将棋引擎初始化失败或 tlm_shogi 扩展缺失",
   "message.chuying.need_empty_hand": "褚嬴代打：请空手（棋盘需要空手操作）"
 }

@@ -13,26 +13,31 @@
 An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **NeoForge 1.21.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
 
 > **Pure client, no server mod needed** — engines calculate locally, then your right-click on the board is simulated through vanilla interaction, so the server does **NOT** need this mod installed (works on other people's servers, no network channel mismatch).
+>
+> **No subprocesses (2.0)** — all three engines are JNI native libraries (`.dll` / `.so` / `.dylib`) running **inside the game process**. Nothing is spawned, and the "custom engine path" option is gone.
 
 ## Features
 
 | Feature | Description |
 |---|---|
 | **Pure Client** | Server needs nothing extra; works in singleplayer & on any multiplayer server |
+| **No subprocess** | Engines are JNI native libraries running in-process; no exe is ever spawned |
 | **One-key Proxy Play** | Toggle on/off with **K**; keybind remappable in Controls |
 | **4 Think Strength levels** | LOW / DEFAULT / HIGH / MAX — adjustable in-game, applied to the very next move |
 | **Avoid Draw (Chess)** | Push Stockfish to actively seek the win instead of settling for a draw |
-| **Auto-extract engines** | Bundled Windows / Linux / macOS engines extracted on first launch, no setup |
+| **Auto-extract engines** | Bundled Windows / Linux / macOS native libraries, extracted to `config/chuying/engines/` on first run |
+| **Shogi support** | With the `tlm_shogi` addon installed, shogi is played for you too (using its bundled Sunfish, zero extra size) |
 | **Multi-language** | Simplified Chinese, English, 日本語 |
 | **Debug HELL** | Force the Gomoku maid to HELL difficulty (client-only, for testing) |
 
 ## Supported Games & Engines
 
-| Game | Engine | Protocol |
-|---|---|---|
-| Gomoku | [Rapfi](https://github.com/dhbloo/rapfi) | Pbrain |
-| Chinese Chess (Xiangqi) | [Pikafish](https://github.com/official-pikafish/Pikafish) | UCI |
-| International Chess | [Stockfish](https://github.com/official-stockfish/Stockfish) | UCI |
+| Game | Engine | Protocol | Notes |
+|---|---|---|---|
+| Gomoku | [Rapfi](https://github.com/dhbloo/rapfi) | Pbrain | bundled in the jar |
+| Chinese Chess (Xiangqi) | [Pikafish](https://github.com/official-pikafish/Pikafish) | UCI | bundled in the jar |
+| International Chess | [Stockfish](https://github.com/official-stockfish/Stockfish) | UCI | bundled in the jar |
+| Shogi | Sunfish bundled with `tlm_shogi` | reflection | not shipped here; needs the addon installed |
 
 ## Platform Packages
 
@@ -64,16 +69,18 @@ One build produces three jars — pick the one for your OS (don't mix them up):
 
 - Press **K** to toggle proxy play (remappable in Options → Controls)
 - Walk up to a board, **keep your main hand empty** (the board requires an empty hand), and moves are made for you
+- The same works for shogi boards (needs the `tlm_shogi` addon); promotion choices are answered automatically
 - Settings → Mods → Chuying Proxy Play → Config:
-  - **Think Strength**: LOW (sandbag) → DEFAULT → HIGH → MAX (higher = steadier, fewer blunders)
+  - **Think Strength**: LOW (sandbag) → DEFAULT → HIGH → MAX (higher = steadier, fewer blunders); shogi uses the same tiers (DEFAULT = 10s / depth 20, far above the maid's own level)
   - **Avoid Draw** (Chess only): OFF / GENTLE / ACTIVE / MAX — avoid forced draws
-  - Engine paths can be overridden with your own engines (empty = bundled)
+  - **Shogi proxy play**: available when `tlm_shogi` is installed; turn it off to leave shogi alone
 
 ## How It Works (Pure Client)
 
 - The engine calculates the move locally, then the move is converted back into a 3D board position and sent as a **vanilla** `ServerboundUseItemOnPacket` (simulated right-click)
 - The server just sees a player clicking the board normally and lets the installed TLM handle the move — **zero server-side changes or dependencies**
-- Xiangqi/Chess use two-step clicks (select piece → move), Gomoku uses a single click
+- Xiangqi/Chess use two-step clicks (select piece → move); Gomoku/Shogi are resolved through their own multi-part board offsets
+- Engine side: each engine's `main()` is renamed at build time and linked into a JNI library, with `std::cin`/`std::cout` redirected to in-memory queues, so the full UCI/pbrain loop runs **inside the game process — no process is ever created**
 
 ## Internationalization
 
@@ -81,16 +88,17 @@ UI and hints support Simplified Chinese, English and 日本語, switching automa
 
 ## For Developers
 
-Engine binaries are not committed to git; the GitHub Actions `engines` workflow (manual trigger) assembles and uploads them.
+Engine binaries are not committed to git; the GitHub Actions `native-build` workflow clones the engine sources on CI, compiles them into per-platform JNI libraries and uploads them as artifacts. Download those into the mod's resource folder.
 
 ```bash
-# 1. Put engine binaries into src/main/resources/engines/{windows,linux,macos}/ and shared/
+# 1. Put the CI outputs (chuying_*.dll|so|dylib) into src/main/resources/engines/{windows,linux,macos}/
+#    weights live in engines/shared/
 # 2. Build all three platform jars at once
 ./gradlew build
 ```
 
-Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `-windows.jar` / `-linux.jar` / `-macos.jar`.
+Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `Chuying Proxy Play<version>-NeoForge-1.21.1-{windows,linux,macos}.jar`.
 
 ## License
 
-**GPL-3.0-only** — bundled engines (Pikafish / Stockfish / Rapfi) are GPL-3.0 as well.
+**GPL-3.0-only** — the bundled engines (Pikafish / Stockfish / Rapfi) are GPL-3.0 as well; because they are now linked into the same process, the combined work is distributed under GPL-3.0. Exact engine versions/commits and every build-time patch are listed in `THIRD_PARTY_LICENSES.txt` and in the `BUILD_INFO.txt` shipped next to the native libraries.

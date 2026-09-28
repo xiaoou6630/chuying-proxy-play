@@ -15,6 +15,7 @@
   "chuying.configuration.avoidDraw.ACTIVE": "ACTIVE",
   "chuying.configuration.avoidDraw.AGGRESSIVE": "AGGRESSIVE",
   "chuying.configuration.debugForceMaxMaid": "Debug: Force Gomoku Maid to HELL difficulty",
+  "chuying.configuration.shogiEnabled": "Shogi Proxy Play (requires tlm_shogi)",
 
   "key.category.chuying": "Chuying Proxy Play",
   "key.chuying.proxy_play": "Toggle Proxy Play",
@@ -23,5 +24,6 @@
   "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine library missing or extraction failed",
   "message.chuying.no_wchess_engine": "Chuying: Western Chess engine library missing or extraction failed",
   "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine library missing or extraction failed",
+  "message.chuying.no_shogi_engine": "Chuying: Shogi engine init failed or tlm_shogi addon missing",
   "message.chuying.need_empty_hand": "Chuying Proxy Play: empty your main hand (the board requires an empty hand)"
 }
