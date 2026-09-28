@@ -47,6 +47,15 @@ else()
 endif()
 include_directories("$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
 
+# Platform folder name, must match EngineExtractor.platform() in the mod.
+if(WIN32)
+    set(CHUYING_PLATFORM windows)
+elseif(APPLE)
+    set(CHUYING_PLATFORM macos)
+else()
+    set(CHUYING_PLATFORM linux)
+endif()
+
 # ---------------------------------------------------------------------------
 # Engine sources (main.cpp already patched to engine_main by CI script)
 # ---------------------------------------------------------------------------
@@ -84,5 +93,11 @@ chuying_bridge(chuying_pikafish
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
 # Pikafish bundles zstd whose ASM fast-loop is an .S file not in our glob; disable it.
 target_compile_definitions(chuying_pikafish PRIVATE ZSTD_DISABLE_ASM)
+# Pikafish loads its net at runtime (no INCBIN) and refuses to initialise without
+# it. network.cpp searches CWD, the binary dir, then DEFAULT_NNUE_DIRECTORY; the
+# mod extracts pikafish.nnue to config/chuying/engines/<platform>/ relative to the
+# game directory (the process CWD), so point the engine straight at it.
+target_compile_definitions(chuying_pikafish PRIVATE
+    DEFAULT_NNUE_DIRECTORY="config/chuying/engines/${CHUYING_PLATFORM}")
 
 chuying_bridge(chuying_rapfi LIBS rapfi)

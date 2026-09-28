@@ -20,6 +20,12 @@ cd "$ROOT/native/java-test"
 mkdir -p out
 javac -d out com/chuying/engine/NativeEngineBridge.java SmokeTest.java || exit 1
 
+# Pikafish loads pikafish.nnue at runtime and looks in the CWD first, so drop the
+# net we downloaded for the build next to the test (the mod ships it in the jar).
+if [ -f "$ROOT/native/engines/pikafish/src/pikafish.nnue" ]; then
+    cp "$ROOT/native/engines/pikafish/src/pikafish.nnue" ./pikafish.nnue
+fi
+
 run_one() { # engine strict
     local engine="$1" strict="$2" rc=0
     echo "==> smoke: $engine ($DIST/chuying_$engine.$EXT)"
