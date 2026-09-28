@@ -14,7 +14,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded") # static CRT: keep iostream state per-DLL
     add_compile_options(/utf-8 /EHsc /Zc:lambda)    # /Zc:lambda: fix C3493 on Stockfish lambdas
     add_compile_definitions(USE_SSE2) # x64 MSVC has SSE2 baseline (POPcnt left off: safe fallback)
 else()
@@ -27,6 +26,15 @@ else()
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
         add_compile_definitions(USE_NEON=8 IS_64BIT)
     endif()
+endif()
+
+# Windows MinGW: statically link libgcc/libstdc++/winpthread so the shipped DLL
+# needs no extra runtime DLLs on the user's machine.
+if(WIN32 AND NOT MSVC)
+    set(CHUYING_WIN_STATIC_LINK -static-libgcc -static-libstdc++
+        -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic)
+else()
+    set(CHUYING_WIN_STATIC_LINK "")
 endif()
 
 # JNI headers (JAVA_HOME provided by actions/setup-java)
@@ -60,6 +68,9 @@ function(chuying_bridge name)
     target_include_directories(${name} PRIVATE ${ARG_INCLUDES})
     if(ARG_LIBS)
         target_link_libraries(${name} PRIVATE ${ARG_LIBS})
+    endif()
+    if(CHUYING_WIN_STATIC_LINK)
+        target_link_options(${name} PRIVATE ${CHUYING_WIN_STATIC_LINK})
     endif()
     set_target_properties(${name} PROPERTIES PREFIX "")
 endfunction()

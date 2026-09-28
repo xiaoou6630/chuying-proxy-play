@@ -40,6 +40,13 @@ public class SmokeTest {
                 bridge.send("isready");
                 ok = expect(bridge, "readyok", 60000);
             }
+            // Real search: handshake alone passes even when NNUE eval is broken,
+            // which is exactly how a crashing build slipped through before.
+            if (ok) {
+                bridge.send("position startpos moves e2e4 e7e5");
+                bridge.send("go depth 4");
+                ok = expectPrefix(bridge, "bestmove", 120000);
+            }
             bridge.send("quit");
             long t0 = System.currentTimeMillis();
             while (bridge.isAlive() && System.currentTimeMillis() - t0 < 10000) {
@@ -61,6 +68,20 @@ public class SmokeTest {
             if (line != null) {
                 System.out.println("[smoke] < " + line);
                 if (want.equals(line)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Wait for any line starting with the given prefix (e.g. "bestmove"). */
+    static boolean expectPrefix(NativeEngineBridge bridge, String prefix, int timeoutMs)
+            throws InterruptedException {
+        long t0 = System.currentTimeMillis();
+        while (System.currentTimeMillis() - t0 < timeoutMs) {
+            String line = bridge.read(500);
+            if (line != null) {
+                System.out.println("[smoke] < " + line);
+                if (line.startsWith(prefix)) return true;
             }
         }
         return false;

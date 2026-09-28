@@ -118,6 +118,19 @@ else
                  -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF)
 fi
 
+# Windows: use MSYS2 MinGW-w64 gcc instead of MSVC.
+# MSVC does not honour INCBIN (nets silently not embedded) and the resulting
+# build crashes inside NNUE evaluation; it also breaks Pikafish's static init.
+# MinGW has the same compiler semantics as the proven linux/macos builds.
+if [ "$PLATFORM" = "windows" ]; then
+    MINGW=/c/msys64/mingw64
+    [ -x "$MINGW/bin/g++.exe" ] || { log "ERROR: MinGW-w64 not found at $MINGW"; exit 1; }
+    export PATH="$MINGW/bin:$PATH"
+    CMAKE_ARGS+=(-G Ninja
+                 -DCMAKE_C_COMPILER="$MINGW/bin/gcc.exe"
+                 -DCMAKE_CXX_COMPILER="$MINGW/bin/g++.exe")
+fi
+
 log "cmake configure: ${CMAKE_ARGS[*]}"
 cmake "${CMAKE_ARGS[@]}"
 log "cmake build"
