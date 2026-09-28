@@ -22,10 +22,10 @@ else()
     link_libraries(Threads::Threads)
     # Mirrors Pikafish/Stockfish Makefile minimum arch flags
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64)")
-        add_compile_definitions(USE_SSE2 USE_POPCNT)
+        add_compile_definitions(USE_SSE2 USE_POPCNT IS_64BIT)
         add_compile_options(-msse3 -mpopcnt)
     elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
-        add_compile_definitions(USE_NEON=8)
+        add_compile_definitions(USE_NEON=8 IS_64BIT)
     endif()
 endif()
 

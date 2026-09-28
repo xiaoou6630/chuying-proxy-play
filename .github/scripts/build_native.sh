@@ -14,6 +14,11 @@ mkdir -p "$ENGINES" native/dist
 
 log() { echo "==> $*"; }
 
+# portable in-place sed: GNU needs -i, BSD (macOS) needs -i ''
+sed_inplace() {
+    if sed --version >/dev/null 2>&1; then /usr/bin/sed -i "$@"; else /usr/bin/sed -i '' "$@"; fi
+}
+
 git_clone() { # url dir [ref]
     local url="$1" dir="$2" ref="${3:-}"
     rm -rf "$dir"
@@ -46,7 +51,7 @@ rename_mains() { # dir want_substring
     for f in "${files[@]:-}"; do [ -n "$f" ] || continue; [[ "$f" == *"$want"* ]] || ordered+=("$f"); done
     for f in "${ordered[@]:-}"; do
         if [ "$assigned" -eq 0 ]; then
-            sed -i 's/int main(int argc, char\* argv\[\])/int engine_main(int argc, char* argv[])/g;
+            sed_inplace 's/int main(int argc, char\* argv\[\])/int engine_main(int argc, char* argv[])/g;
                     s/int main(int argc, char \*\*argv)/int engine_main(int argc, char** argv)/g;
                     s/int main(int argc, char\*\* argv)/int engine_main(int argc, char** argv)/g;
                     s/int main(int argc, char \*argv\[\])/int engine_main(int argc, char* argv[])/g;
@@ -54,7 +59,7 @@ rename_mains() { # dir want_substring
             log "engine_main <- $f"
             assigned=1
         else
-            sed -i 's/int main(int argc, char\* argv\[\])/int engine_main_disabled(int argc, char* argv[])/g;
+            sed_inplace 's/int main(int argc, char\* argv\[\])/int engine_main_disabled(int argc, char* argv[])/g;
                     s/int main(int argc, char \*\*argv)/int engine_main_disabled(int argc, char** argv)/g;
                     s/int main(int argc, char\*\* argv)/int engine_main_disabled(int argc, char** argv)/g;
                     s/int main(int argc, char \*argv\[\])/int engine_main_disabled(int argc, char* argv[])/g;
