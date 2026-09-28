@@ -1,0 +1,48 @@
+# 临时 POC：JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi）三平台编译。
+# 仅用于 poc/native-dll 分支验证「不 spawn OS 进程」路线；产物 90 天过期。
+name: native-build
+
+on:
+  push:
+    branches: [poc/native-dll]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: native-${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: windows, os: windows-latest }
+          - { platform: linux,   os: ubuntu-latest }
+          - { platform: macos,   os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+
+      # JNI headers + smoke test JVM
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build native engine libraries
+        run: bash .github/scripts/build_native.sh ${{ matrix.platform }}
+        shell: bash
+
+      - name: JVM smoke test
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }}
+        shell: bash
+
+      - name: Upload native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: engines-native-${{ matrix.platform }}
+          path: native/dist/
+          if-no-files-found: error
+          retention-days: 30

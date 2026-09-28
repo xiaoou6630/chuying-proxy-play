@@ -50,3 +50,10 @@ src/main/resources/engines/
 
 ### 本地依赖 jar 不进仓库（CI 从 modrinth 下载）###
 libs/
+
+### 原生引擎 POC（引擎源码由 CI 拉取，产物走 artifact）###
+native/engines/
+native/build/
+native/dist/
+native/gen_targets.cmake
+native/java-test/out/
