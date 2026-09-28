@@ -35,10 +35,7 @@ jobs:
         run: bash .github/scripts/build_native.sh ${{ matrix.platform }}
         shell: bash
 
-      - name: JVM smoke test
-        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }}
-        shell: bash
-
+      # Upload BEFORE smoke: artifacts survive smoke failures/hangs
       - name: Upload native libraries
         uses: actions/upload-artifact@v4
         with:
@@ -46,3 +43,7 @@ jobs:
           path: native/dist/
           if-no-files-found: error
           retention-days: 30
+
+      - name: JVM smoke test
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }}
+        shell: bash
