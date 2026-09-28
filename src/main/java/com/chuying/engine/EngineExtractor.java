@@ -117,8 +117,8 @@ public final class EngineExtractor {
         Path sharedDir = dir.resolve("shared");
         Path platDir = dir.resolve(platform());
 
-        extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/", false);
-        extractResources(nativeLibResources(), platDir, "engines/" + platform() + "/", false);
+        extractResources(SHARED_RESOURCES, sharedDir, "engines/shared/");
+        extractResources(nativeLibResources(), platDir, "engines/" + platform() + "/");
         copySharedToPlatform(sharedDir, platDir);
     }
 
@@ -133,12 +133,17 @@ public final class EngineExtractor {
      * 解压资源到目标目录。
      * {@code prefix} 是 jar 内资源前缀（含 engines/ 与平台/shared 段），
      * 剥离后剩余的相对路径再 resolve 到 {@code targetRoot}。
+     * <p>
+     * 覆盖规则：目标文件与 jar 内同名资源<b>大小一致才跳过</b>，大小不同就覆盖。
+     * 早期版本是「存在即跳过」，结果引擎升级后旧权重留在原地（Pikafish 权重与引擎不匹配
+     * 会直接 std::exit 杀掉 JVM），故改为按大小比对。
      */
-    private static void extractResources(List<String> resources, Path targetRoot, String prefix, boolean replace) {
+    private static void extractResources(List<String> resources, Path targetRoot, String prefix) {
         for (String res : resources) {
             String rel = res.substring(prefix.length());
             Path target = targetRoot.resolve(rel.replace('/', java.io.File.separatorChar));
-            if (!replace && Files.exists(target)) {
+            long expected = resourceSize(res);
+            if (expected > 0 && sameSize(target, expected)) {
                 continue;
             }
             try (InputStream in = EngineExtractor.class.getResourceAsStream("/" + res)) {
@@ -155,6 +160,31 @@ public final class EngineExtractor {
         }
     }
 
+    /** jar 内资源未压缩大小；拿不到（开发环境为目录形式）返回 -1 */
+    private static long resourceSize(String res) {
+        try {
+            java.net.URL url = EngineExtractor.class.getResource("/" + res);
+            if (url == null) {
+                return -1L;
+            }
+            java.net.URLConnection conn = url.openConnection();
+            if (conn instanceof java.net.JarURLConnection) {
+                java.util.jar.JarEntry entry = ((java.net.JarURLConnection) conn).getJarEntry();
+                return entry == null ? -1L : entry.getSize();
+            }
+        } catch (Exception ignored) {
+        }
+        return -1L;
+    }
+
+    private static boolean sameSize(Path file, long expected) {
+        try {
+            return Files.exists(file) && Files.size(file) == expected;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     /**
      * 把 shared 里的通用依赖复制到平台目录：
      * - pikafish.nnue → 平台目录根（EvalFile 指向）
@@ -162,13 +192,13 @@ public final class EngineExtractor {
      * - rapfi/* → 平台目录/rapfi/（config.toml 重新生成，模型路径改写为绝对路径）
      */
     private static void copySharedToPlatform(Path sharedDir, Path platDir) {
-        copyIfAbsent(sharedDir.resolve("pikafish.nnue"), platDir.resolve("pikafish.nnue"));
+        copyIfChanged(sharedDir.resolve("pikafish.nnue"), platDir.resolve("pikafish.nnue"));
         Path sharedSf = sharedDir.resolve("stockfish");
         if (Files.isDirectory(sharedSf)) {
             try (var files = Files.list(sharedSf)) {
                 Path sfDir = platDir.resolve("stockfish");
                 Files.createDirectories(sfDir);
-                files.forEach(f -> copyIfAbsent(f, sfDir.resolve(f.getFileName().toString())));
+                files.forEach(f -> copyIfChanged(f, sfDir.resolve(f.getFileName().toString())));
             } catch (IOException e) {
                 Chuying.LOGGER.error("复制 Stockfish 权重失败", e);
             }
@@ -185,7 +215,7 @@ public final class EngineExtractor {
                 if (name.equals("config.toml")) {
                     writeRapfiConfig(f, rapfiDir.resolve(name), rapfiDir);
                 } else {
-                    copyIfAbsent(f, rapfiDir.resolve(name));
+                    copyIfChanged(f, rapfiDir.resolve(name));
                 }
             });
         } catch (IOException e) {
@@ -213,11 +243,15 @@ public final class EngineExtractor {
         }
     }
 
-    private static void copyIfAbsent(Path src, Path dst) {
-        if (!Files.exists(src) || Files.exists(dst)) {
+    /** shared → 平台目录的复制：目标不存在或大小不同才复制（大小相同视为同一份） */
+    private static void copyIfChanged(Path src, Path dst) {
+        if (!Files.exists(src)) {
             return;
         }
         try {
+            if (Files.exists(dst) && Files.size(dst) == Files.size(src)) {
+                return;
+            }
             Files.createDirectories(dst.getParent());
             Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
