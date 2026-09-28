@@ -136,6 +136,14 @@ sed_inplace \
     's/bool kingAttacks = attackers & pieces(KING);/bool kingAttacks = static_cast<bool>(attackers \& pieces(KING));/' \
     "$ENGINES/pikafish/src/position.cpp"
 
+# Rapfi is built with NO_MULTI_THREADING (see native/CMakeLists.txt: its global
+# HashTable clear spawns worker threads and joins them, which deadlocks inside the
+# Windows loader lock). Upstream only ever used that switch for Emscripten, so one
+# place still touches the now-absent std::thread member: in a single-threaded build
+# there is nothing to wait for, so drop the self-check.
+sed_inplace 's/th->thread\.get_id() != std::this_thread::get_id()/false/' \
+    "$ENGINES/rapfi/Rapfi/search/searchthread.cpp"
+
 # Windows: current Stockfish/Pikafish replace the argc/argv handed to their UCI
 # engine with the *process* command line (GetCommandLineW()). Inside the JVM that
 # is the Minecraft launcher's command line, which the engine then executes as a
