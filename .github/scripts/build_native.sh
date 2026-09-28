@@ -95,6 +95,12 @@ rename_mains "$ENGINES/stockfish/src" main
 rename_mains "$ENGINES/pikafish/src"  main.cpp
 rename_mains "$ENGINES/rapfi/Rapfi"   pbrain
 
+# MSVC: std::_Unsigned128 (Pikafish's u128) lacks the implicit operator bool
+# that gcc's unsigned __int128 has. static_cast<bool> is portable everywhere.
+sed_inplace \
+    's/bool kingAttacks = attackers & pieces(KING);/bool kingAttacks = static_cast<bool>(attackers \& pieces(KING));/' \
+    "$ENGINES/pikafish/src/position.cpp"
+
 # ---------------------------------------------------------------------------
 # 3. CMake configure + build (engine sources globbed by native/CMakeLists.txt)
 # ---------------------------------------------------------------------------
