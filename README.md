@@ -25,8 +25,8 @@
 | **思考强度四档** | 低 / 默认 / 高 / 极致 —— 游戏内实时调整，下一步立即生效 |
 | **避和强度（国象）** | 让 Stockfish 主动求胜、拒绝被拖平 |
 | **引擎自动解压** | 内置 Windows / Linux / macOS 原生库，首次运行解压到 `config/chuying/engines/` |
-| **将棋联动** | 装了将棋扩展 `tlm_shogi` 也照样代打（走它自带的 Sunfish，不额外占体积） |
-| **棋圣 PVP 代打** | 装了棋圣 `ChessPVP` 时支持 PVP 代打：只替自己在对局中的一方落子（需该扩展支持的潜行点击交互） |
+| **将棋联动** | 装了将棋扩展 [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) 也照样代打（走它自带的 Sunfish，不额外占体积） |
+| **棋圣 PVP 代打** | 装了棋圣 [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) 时支持 PVP 代打：只替自己在对局中的一方落子（需该扩展支持的潜行点击交互） |
 | **三语界面** | 简体中文、English、日本語 |
 | **调试 HELL** | 强制五子棋女仆最高难度 HELL（纯客户端，测试用） |
 

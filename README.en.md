@@ -26,8 +26,8 @@ An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) o
 | **4 Think Strength levels** | LOW / DEFAULT / HIGH / MAX — adjustable in-game, applied to the very next move |
 | **Avoid Draw (Chess)** | Push Stockfish to actively seek the win instead of settling for a draw |
 | **Auto-extract engines** | Bundled Windows / Linux / macOS native libraries, extracted to `config/chuying/engines/` on first run |
-| **Shogi support** | With the `tlm_shogi` addon installed, shogi is played for you too (using its bundled Sunfish, zero extra size) |
-| **ChessPVP support** | With the `ChessPVP` addon installed, PVP games are played for you too: only your own side is played (requires that addon's sneak-click interaction) |
+| **Shogi support** | With the [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) addon installed, shogi is played for you too (using its bundled Sunfish, zero extra size) |
+| **ChessPVP support** | With the [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) addon installed, PVP games are played for you too: only your own side is played (requires that addon's sneak-click interaction) |
 | **Multi-language** | Simplified Chinese, English, 日本語 |
 | **Debug HELL** | Force the Gomoku maid to HELL difficulty (client-only, for testing) |
 

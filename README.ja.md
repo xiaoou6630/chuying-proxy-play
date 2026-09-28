@@ -26,8 +26,8 @@
 | **思考強度4段階** | 低 / 標準 / 高 / 極限 —— ゲーム内でリアルタイム調整、次の一手から即反映 |
 | **引き分け回避（チェス）** | Stockfish に勝利を狙わせ、強制ドローを回避 |
 | **エンジン自動展開** | Windows / Linux / macOS 用ネイティブライブラリを同梱、初回起動時に `config/chuying/engines/` へ展開 |
-| **将棋（しょうぎ）対応** | `tlm_shogi` アドオン導入時は将棋も代打（同梱の Sunfish を使用、サイズ増加なし） |
-| **棋聖 PVP 対応** | `ChessPVP` アドオン導入時は PVP も代打：自分の担当側のみを打つ（同アドオンのスニーククリック操作が必要） |
+| **将棋（しょうぎ）対応** | [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) アドオン導入時は将棋も代打（同梱の Sunfish を使用、サイズ増加なし） |
+| **棋聖 PVP 対応** | [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) アドオン導入時は PVP も代打：自分の担当側のみを打つ（同アドオンのスニーククリック操作が必要） |
 | **3言語対応** | 簡体字中国語、English、日本語 |
 | **デバッグ HELL** | 五目並べのメイドを最高難易度 HELL に強制（クライアントのみ、テスト用） |
 
