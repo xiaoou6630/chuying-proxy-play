@@ -117,6 +117,16 @@ EngineBridge& EngineBridge::instance() {
     return inst;
 }
 
+// JVM shutdown destroys the function-local static. A std::thread that has
+// finished but was never joined still counts as joinable -> its destructor
+// calls std::terminate ("terminate called without an active exception").
+EngineBridge::~EngineBridge() {
+    if (worker_.joinable()) {
+        if (engineExited_.load()) worker_.join(); // finished but unjoined: clean up
+        else worker_.detach();                    // still running: process is dying anyway
+    }
+}
+
 bool EngineBridge::start(const std::vector<std::string>& args) {
     if (running_.exchange(true)) return false;
 

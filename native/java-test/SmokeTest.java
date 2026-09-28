@@ -46,6 +46,7 @@ public class SmokeTest {
                 Thread.sleep(100);
             }
             ok = ok && !bridge.isAlive();
+            bridge.stop(); // join the worker thread before JVM exit
         }
 
         System.out.println("[smoke] " + engine + " -> " + (ok ? "PASS" : "FAIL"));

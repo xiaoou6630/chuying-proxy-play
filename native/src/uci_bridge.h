@@ -51,6 +51,7 @@ public:
 
 private:
     EngineBridge() = default;
+    ~EngineBridge();
 
     void engineThreadMain(std::vector<std::string> args);
     void restoreStreams();

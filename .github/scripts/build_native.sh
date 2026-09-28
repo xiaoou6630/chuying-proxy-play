@@ -99,12 +99,17 @@ rename_mains "$ENGINES/rapfi/Rapfi"   pbrain
 # 3. CMake configure + build (engine sources globbed by native/CMakeLists.txt)
 # ---------------------------------------------------------------------------
 CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
-# Rapfi: lock SIMD to SSE baseline (its own CMake auto-detects host with -march=native)
-CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
-             -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
-             -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF)
+# Rapfi: lock SIMD for portability (its own CMake auto-detects host with -march=native).
+# SSE x86 only; on ARM everything off (POC correctness first).
 if [ "$PLATFORM" = "macos" ]; then
-    CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=arm64)
+    CMAKE_ARGS+=(-DUSE_SSE=OFF -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
+                 -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+                 -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
+                 -DCMAKE_OSX_ARCHITECTURES=arm64)
+else
+    CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
+                 -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+                 -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF)
 fi
 
 log "cmake configure: ${CMAKE_ARGS[*]}"
