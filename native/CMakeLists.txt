@@ -52,12 +52,15 @@ list(FILTER PF_SRCS EXCLUDE REGEX "pikafish/src/universal/")
 add_subdirectory(engines/rapfi/Rapfi rf_build)
 
 function(chuying_bridge name)
-    cmake_parse_arguments(ARG "" "" "SOURCES;INCLUDES" ${ARGN})
+    cmake_parse_arguments(ARG "" "" "SOURCES;INCLUDES;LIBS" ${ARGN})
     add_library(${name} SHARED
         ${CMAKE_CURRENT_LIST_DIR}/src/uci_bridge.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/jni_exports.cpp
         ${ARG_SOURCES})
     target_include_directories(${name} PRIVATE ${ARG_INCLUDES})
+    if(ARG_LIBS)
+        target_link_libraries(${name} PRIVATE ${ARG_LIBS})
+    endif()
     set_target_properties(${name} PROPERTIES PREFIX "")
 endfunction()
 
@@ -69,5 +72,4 @@ chuying_bridge(chuying_pikafish
     SOURCES ${PF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
 
-chuying_bridge(chuying_rapfi
-    SOURCES rapfi)
+chuying_bridge(chuying_rapfi LIBS rapfi)
