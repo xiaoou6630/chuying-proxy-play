@@ -240,7 +240,8 @@ platform: $PLATFORM
 built_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); NNUE nets embedded at build time
 pikafish:  https://github.com/official-pikafish/Pikafish $PF_SHA (GPL-3.0)
-rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0)
+pikafish_net_sha256: $(sha256sum "$ENGINES/pikafish/src/pikafish.nnue" 2>/dev/null | cut -d' ' -f1)
+rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0); built single-threaded (NO_MULTI_THREADING)
 bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams
 EOF
 

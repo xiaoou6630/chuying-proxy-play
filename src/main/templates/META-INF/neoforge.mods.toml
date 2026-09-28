@@ -102,6 +102,15 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="BOTH"
 
+# Touhou Little Maid Shogi —— 软依赖：装了才启用将棋代打
+# （纯反射调用，未安装时该功能整体禁用，其余棋类不受影响）
+[[dependencies.${mod_id}]]
+    modId="tlm_shogi"
+    type="optional"
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.

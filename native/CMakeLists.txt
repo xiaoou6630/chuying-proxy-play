@@ -69,6 +69,14 @@ list(FILTER PF_SRCS EXCLUDE REGEX "pikafish/src/universal/")
 # Rapfi: use its own CMakeLists (bundled externals: cpptoml/cxxopts/lz4/simde/zip...)
 # CI patches add_executable(rapfi -> add_library(rapfi STATIC, and main.cpp -> engine_main.
 # SIMD locked to SSE baseline for portability (see build_native.sh CMAKE_ARGS).
+#
+# NO_MULTI_THREADING is mandatory here: Rapfi initialises globals at load time and
+# Search::TT's constructor clears the hash table, which spawns worker threads and
+# joins them. Inside LoadLibrary the loader lock is held, a thread created there
+# cannot start, and the join() deadlocks the whole JVM on Windows (reproduced:
+# loading chuying_rapfi.dll never returns). Without MULTI_THREADING nothing is
+# spawned during static init, so the library loads and searches single-threaded.
+set(NO_MULTI_THREADING ON CACHE BOOL "chuying: no threads during static init" FORCE)
 add_subdirectory(engines/rapfi/Rapfi rf_build)
 
 function(chuying_bridge name)
