@@ -16,9 +16,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded") # static CRT: keep iostream state per-DLL
     add_compile_options(/utf-8 /EHsc)
+    add_compile_definitions(USE_SSE2) # x64 MSVC has SSE2 baseline (POPcnt left off: safe fallback)
 else()
     find_package(Threads REQUIRED)
     link_libraries(Threads::Threads)
+    # Mirrors Pikafish/Stockfish Makefile minimum arch flags
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64)")
+        add_compile_definitions(USE_SSE2 USE_POPCNT)
+        add_compile_options(-msse3 -mpopcnt)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
+        add_compile_definitions(USE_NEON=8)
+    endif()
 endif()
 
 # JNI headers (JAVA_HOME provided by actions/setup-java)
