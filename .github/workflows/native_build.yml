@@ -31,6 +31,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Windows builds engines with MinGW-w64 gcc (MSVC breaks NNUE eval and INCBIN)
+      - name: Set up MinGW-w64
+        if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-ninja
+
       - name: Build native engine libraries
         run: bash .github/scripts/build_native.sh ${{ matrix.platform }}
         shell: bash

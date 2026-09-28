@@ -208,7 +208,7 @@ public final class EngineExtractor {
                         "\"" + rapfiDir.resolve(model).toString().replace('\\', '/') + "\"");
             }
             Files.createDirectories(target.getParent());
-            Files.writeString(target, content, StandardCharsets.UTF_8, StandardCopyOption.REPLACE_EXISTING);
+            Files.writeString(target, content, StandardCharsets.UTF_8);
             Chuying.LOGGER.info("生成 Rapfi 配置: {}", target);
         } catch (IOException e) {
             Chuying.LOGGER.error("生成 Rapfi 配置失败: {}", target, e);

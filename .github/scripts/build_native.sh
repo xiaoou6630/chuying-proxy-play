@@ -123,8 +123,12 @@ fi
 # build crashes inside NNUE evaluation; it also breaks Pikafish's static init.
 # MinGW has the same compiler semantics as the proven linux/macos builds.
 if [ "$PLATFORM" = "windows" ]; then
-    MINGW=/c/msys64/mingw64
-    [ -x "$MINGW/bin/g++.exe" ] || { log "ERROR: MinGW-w64 not found at $MINGW"; exit 1; }
+    MINGW=""
+    for cand in /c/msys64/mingw64 /d/a/msys64/mingw64 /c/tools/msys64/mingw64; do
+        if [ -x "$cand/bin/g++.exe" ]; then MINGW="$cand"; break; fi
+    done
+    [ -n "$MINGW" ] || { log "ERROR: MinGW-w64 g++ not found (looked in msys64/mingw64)"; exit 1; }
+    log "mingw toolchain: $MINGW"
     export PATH="$MINGW/bin:$PATH"
     CMAKE_ARGS+=(-G Ninja
                  -DCMAKE_C_COMPILER="$MINGW/bin/gcc.exe"
