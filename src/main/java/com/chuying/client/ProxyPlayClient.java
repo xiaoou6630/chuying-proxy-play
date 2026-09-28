@@ -2,6 +2,7 @@ package com.chuying.client;
 
 import com.chuying.Chuying;
 import com.chuying.Config;
+import com.chuying.compat.ShogiCompat;
 import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
 import com.chuying.engine.NativeGomokuEngine;
@@ -91,7 +92,14 @@ public class ProxyPlayClient {
         if (mc.player == null || mc.level == null) {
             return;
         }
-        if (!Config.ENABLED.get() || !ProxyPlayState.enabled || ProxyPlayState.busy) {
+        if (!Config.ENABLED.get() || !ProxyPlayState.enabled) {
+            return;
+        }
+        // 将棋升变：服务器弹出升变界面时自动应答（必须早于 busy 判断，界面出现时并不在算招）
+        if (Config.SHOGI_ENABLED.get()) {
+            ShogiCompat.autoAnswerPromote(mc);
+        }
+        if (ProxyPlayState.busy) {
             return;
         }
         // 卡住恢复：10 秒无进展则重新允许走当前局面
@@ -109,7 +117,15 @@ public class ProxyPlayClient {
 
         BlockPos center = null;
         Direction facing = null;
-        if (block instanceof BlockCChess) {
+        if (Config.SHOGI_ENABLED.get() && ShogiCompat.isShogiBoard(block)) {
+            // 将棋 5-part：按 PART 的 (posX,posY) 反推中心块
+            var state = mc.level.getBlockState(pos);
+            int[] off = ShogiCompat.partOffset(state);
+            center = pos.subtract(new Vec3i(off[0], 0, off[1]));
+            facing = ShogiCompat.facingOf(state);
+        } else if (BoardClicker.isSkipped(block)) {
+            return;
+        } else if (block instanceof BlockCChess) {
             var state = mc.level.getBlockState(pos);
             GomokuPart part = state.getValue(BlockCChess.PART);
             center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
@@ -129,7 +145,9 @@ public class ProxyPlayClient {
             return;
         }
         BlockEntity te = mc.level.getBlockEntity(center);
-        if (te instanceof TileEntityCChess c) {
+        if (ShogiCompat.isShogiTile(te)) {
+            tryShogi(mc, center, facing, te);
+        } else if (te instanceof TileEntityCChess c) {
             tryCChess(mc, center, facing, c);
         } else if (te instanceof TileEntityWChess w) {
             tryWChess(mc, center, facing, w);
@@ -150,6 +168,66 @@ public class ProxyPlayClient {
                 it.remove();
             }
         }
+    }
+
+    private static void tryShogi(Minecraft mc, BlockPos center, Direction facing, Object te) {
+        // 对局被重置/换新（回合计数回退）时清除局面去重，无需按 K 重启
+        int counter = ShogiCompat.chessCounter(te);
+        if (counter < ProxyPlayState.lastShogiCounter) {
+            ProxyPlayState.lastFen = "";
+        }
+        ProxyPlayState.lastShogiCounter = counter;
+
+        if (!ShogiCompat.isPlayerTurn(te) || ShogiCompat.isCheckmate(te)
+                || ShogiCompat.isMoveNumberLimit(te) || ShogiCompat.isRepeat(te)) {
+            Chuying.LOGGER.info("[chuying] shogi skip: turn={} mate={} limit={} repeat={}",
+                    ShogiCompat.isPlayerTurn(te), ShogiCompat.isCheckmate(te),
+                    ShogiCompat.isMoveNumberLimit(te), ShogiCompat.isRepeat(te));
+            return;
+        }
+        String sfen = ShogiCompat.sfenOf(te);
+        if (sfen == null || sfen.equals(ProxyPlayState.lastFen)) {
+            return;
+        }
+        claimPosition(sfen);
+        Chuying.LOGGER.info("[chuying] shogi trigger sfen={} center={} facing={}", sfen, center, facing);
+        CompletableFuture.runAsync(() -> {
+            try {
+                String usi = ShogiCompat.think(sfen);
+                Chuying.LOGGER.info("[chuying] shogi bestmove={}", usi);
+                if (usi == null || usi.isEmpty()) {
+                    mc.execute(() -> noticeNoEngine("message.chuying.no_shogi_engine"));
+                    return;
+                }
+                mc.execute(() -> scheduleShogiMove(center, facing, te, usi));
+            } finally {
+                ProxyPlayState.busy = false;
+            }
+        }, Util.backgroundExecutor());
+    }
+
+    /** 将棋"选子→落子"两步模拟点击：USI 走法（棋盘走子 "7g7f"/"7g7f+" 或打驹 "P*5e"）→ 两个格点 */
+    private static void scheduleShogiMove(BlockPos center, Direction facing, Object te, String usi) {
+        boolean promote = ShogiCompat.usiPromotes(usi);
+        int fromPoint;
+        int toPoint;
+        if (usi.length() >= 4 && usi.charAt(1) == '*') {
+            // 打驹：第一下点手驹槽位，第二下点落点
+            fromPoint = ShogiCompat.dropPoint(te, usi.charAt(0));
+            toPoint = ShogiCompat.usiSquareToPoint(usi.substring(2, 4));
+        } else {
+            fromPoint = ShogiCompat.usiSquareToPoint(usi.substring(0, 2));
+            toPoint = ShogiCompat.usiSquareToPoint(usi.substring(2, 4));
+        }
+        if (fromPoint < 0 || toPoint < 0) {
+            Chuying.LOGGER.warn("[chuying] shogi 无法换算格点：usi={} from={} to={}", usi, fromPoint, toPoint);
+            return;
+        }
+        ShogiCompat.setPendingPromote(promote);
+        Chuying.LOGGER.info("[chuying] shogi move usi={} fromPoint={} toPoint={} promote={}",
+                usi, fromPoint, toPoint, promote);
+        PENDING_CLICKS.add(new PendingClick(ShogiBoardClicker.shogiHit(center, facing, fromPoint), 0));
+        PENDING_CLICKS.add(new PendingClick(ShogiBoardClicker.shogiHit(center, facing, toPoint), CHESS_STEP_DELAY_TICKS));
     }
 
     private static void tryCChess(Minecraft mc, BlockPos center, Direction facing, TileEntityCChess c) {

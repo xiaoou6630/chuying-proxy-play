@@ -15,6 +15,8 @@ public final class NativeGomokuEngine implements AutoCloseable {
     private static final int SIZE = 15;
     private static final int START_TIMEOUT_MS = 20_000;
     private static final int STOP_GRACE_MS = 3000;
+    /** 单次读取等待上限；读空只表示「暂时没输出」（冷加载模型、长考都会出现空档） */
+    private static final int READ_SLICE_MS = 200;
 
     private final NativeEngineBridge bridge = new NativeEngineBridge();
     private final String libPath;
@@ -36,8 +38,11 @@ public final class NativeGomokuEngine implements AutoCloseable {
             Chuying.LOGGER.error("原生五子棋引擎库加载失败: {}", libPath, e);
             return false;
         }
-        // argv = [程序名占位, --config, 配置绝对路径]
-        String[] args = {"chuying-rapfi", "--config", configPath};
+        // argv = [--config, 配置绝对路径]；argv[0] 由桥接层补（"chuying-engine"）。
+        // 注意不能自己塞程序名占位：Rapfi 的 CLI 是 `rapfi [mode] [options]`，
+        // 第一个位置参数会被当成运行模式（gomocup/bench/…），多塞一个就变成
+        // "unknown mode xxx" 直接退出。
+        String[] args = {"--config", configPath};
         if (bridge.start(args) != 0) {
             Chuying.LOGGER.error("原生五子棋引擎启动失败: {}", libPath);
             return false;
@@ -48,9 +53,12 @@ public final class NativeGomokuEngine implements AutoCloseable {
         send("INFO rule 0");
         // 首启冷加载模型可能较慢，给足 20 秒
         long deadline = System.currentTimeMillis() + START_TIMEOUT_MS;
-        String line;
         boolean ok = false;
-        while ((line = readUntil(deadline)) != null) {
+        while (System.currentTimeMillis() < deadline) {
+            String line = bridge.read(READ_SLICE_MS);
+            if (line == null) {
+                continue;
+            }
             Chuying.LOGGER.info("[rapfi] {}", line);
             if (line.trim().equalsIgnoreCase("OK")) {
                 ok = true;
@@ -86,8 +94,11 @@ public final class NativeGomokuEngine implements AutoCloseable {
         }
         send("DONE");
         long deadline = System.currentTimeMillis() + thinkMs + STOP_GRACE_MS;
-        String line;
-        while ((line = readUntil(deadline)) != null) {
+        while (System.currentTimeMillis() < deadline) {
+            String line = bridge.read(READ_SLICE_MS);
+            if (line == null) {
+                continue;
+            }
             Chuying.LOGGER.info("[rapfi] {}", line);
             String trimmed = line.trim();
             if (trimmed.matches("\\d+\\s*,\\s*\\d+")) {
@@ -106,14 +117,6 @@ public final class NativeGomokuEngine implements AutoCloseable {
         }
         Chuying.LOGGER.warn("[rapfi] 思考超时");
         return null;
-    }
-
-    private String readUntil(long deadline) {
-        long wait = deadline - System.currentTimeMillis();
-        if (wait <= 0) {
-            return null;
-        }
-        return bridge.read((int) Math.min(wait, 500));
     }
 
     private void send(String cmd) {

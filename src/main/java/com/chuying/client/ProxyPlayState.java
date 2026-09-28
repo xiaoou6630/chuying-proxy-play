@@ -18,6 +18,7 @@ public final class ProxyPlayState {
     public static volatile int lastCChessCounter = -1;
     public static volatile int lastWChessCounter = -1;
     public static volatile int lastGomokuCounter = -1;
+    public static volatile int lastShogiCounter = -1;
 
     private ProxyPlayState() {
     }

@@ -76,6 +76,11 @@ public final class Config {
             .comment("避和强度（仅国际象棋 Stockfish 生效）：主动求胜、避免强制和棋。关闭 = 引擎默认。")
             .defineEnum("avoidDraw", AvoidDraw.ACTIVE);
 
+    /** 将棋联动开关：默认开启；需安装 tlm_shogi 将棋扩展，未安装时自动禁用 */
+    public static final ModConfigSpec.BooleanValue SHOGI_ENABLED = BUILDER
+            .comment("将棋代打开关：默认开启。需要安装 tlm_shogi 将棋扩展；未安装时自动禁用，不影响其它棋种。")
+            .define("shogiEnabled", true);
+
     /** 调试：强制五子棋女仆最高难度 HELL（纯客户端 Mixin）。默认关闭，测试用 */
     public static final ModConfigSpec.BooleanValue DEBUG_FORCE_MAX_MAID = BUILDER
             .comment("调试：强制五子棋女仆用最高难度 HELL（纯客户端，不改任何服务端数据）。默认关闭。")

@@ -5,11 +5,16 @@ import com.github.tartaricacid.touhoulittlemaid.block.properties.GomokuPart;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.Set;
 
 /**
  * 纯客户端"模拟玩家右键棋盘交叉点"，替代自定义网络包。
@@ -27,6 +32,16 @@ public final class BoardClicker {
     /** 五子棋格距与命中区间（TLM getData 常量） */
     private static final double GOMOKU_STEP = 0.1316;
     private static final double GOMOKU_HIT_HALF = 0.035; // 0.07 区间中点
+
+    /**
+     * 通用棋盘分支（象棋/五子棋）的跳过名单：命中的方块若在此名单内，则不按通用棋盘处理，
+     * 避免与专用分支/其它系统重复触发。
+     * <ul>
+     *   <li>tlm_shogi:jchess —— 将棋棋盘（5-part），由将棋专用分支处理</li>
+     *   <li>create_labor 命名空间 —— 工位坐垫等非棋类方块，一律跳过</li>
+     * </ul>
+     */
+    private static final Set<String> SKIP_BLOCK_IDS = Set.of("tlm_shogi:jchess");
 
     /** 五子棋 9 个 part 的偏移参数（顺序：上行→中行→下行，每行左→中→右） */
     private record GPart(GomokuPart part, double xStart, int xIdxOff, double yStart, int yIdxOff) {
@@ -100,6 +115,17 @@ public final class BoardClicker {
         }
         Chuying.LOGGER.info("[chuying] click pos={} hit={}", bhr.getBlockPos(), bhr.getLocation());
         mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, bhr);
+    }
+
+    /**
+     * 命中方块是否应被通用棋盘分支跳过：将棋棋盘（专用分支处理）与 create_labor 工位坐垫等。
+     */
+    public static boolean isSkipped(Block block) {
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        if (id == null) {
+            return false;
+        }
+        return "create_labor".equals(id.getNamespace()) || SKIP_BLOCK_IDS.contains(id.toString());
     }
 
     /** 由行列选 part：x 左(0~3)/中(4~10)/右(11~14)，z 上(0~3)/中(4~10)/下(11~14) */
