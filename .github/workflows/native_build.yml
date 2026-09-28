@@ -64,6 +64,25 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: JVM smoke test
-        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }}
+      # One step per engine: a hung engine library can then only burn its own
+      # timeout, and the failing engine is obvious from the step name.
+      - name: JVM smoke test (stockfish)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 4
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} stockfish
+        shell: bash
+
+      - name: JVM smoke test (pikafish)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 4
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} pikafish
+        shell: bash
+
+      - name: JVM smoke test (rapfi)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 4
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} rapfi
         shell: bash

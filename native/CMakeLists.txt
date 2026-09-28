@@ -28,11 +28,14 @@ else()
     endif()
 endif()
 
-# Windows MinGW: statically link libgcc/libstdc++/winpthread so the shipped DLL
-# needs no extra runtime DLLs on the user's machine.
+# Windows MinGW: link the whole C++ runtime statically. The shipped DLL must not
+# import libwinpthread-1.dll / libgcc_s_seh-1.dll / libstdc++-6.dll: those are
+# absent on end-user machines and on the CI runners, and a missing dependency
+# makes System.load() fail (or hang) inside the JVM. Plain -static is the only
+# reliable switch here: -Wl,-Bstatic/-Bdynamic around -lwinpthread does not work
+# because gcc appends its own implicit -lwinpthread after our flags.
 if(WIN32 AND NOT MSVC)
-    set(CHUYING_WIN_STATIC_LINK -static-libgcc -static-libstdc++
-        -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic)
+    set(CHUYING_WIN_STATIC_LINK -static -static-libgcc -static-libstdc++)
 else()
     set(CHUYING_WIN_STATIC_LINK "")
 endif()

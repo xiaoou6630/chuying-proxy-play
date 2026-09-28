@@ -125,6 +125,20 @@ sed_inplace \
     's/bool kingAttacks = attackers & pieces(KING);/bool kingAttacks = static_cast<bool>(attackers \& pieces(KING));/' \
     "$ENGINES/pikafish/src/position.cpp"
 
+# Windows: current Stockfish/Pikafish replace the argc/argv handed to their UCI
+# engine with the *process* command line (GetCommandLineW()). Inside the JVM that
+# is the Minecraft launcher's command line, which the engine then executes as a
+# single UCI command (and quits, because "argc > 1" means one-shot). Disable the
+# override so the engine keeps our argv: argc == 1 makes it read the redirected
+# std::cin stream instead.
+for f in "$ENGINES/stockfish/src/misc.cpp" "$ENGINES/pikafish/src/misc.cpp"; do
+    [ -f "$f" ] || continue
+    if grep -q 'CommandLineToArgvW(GetCommandLineW()' "$f"; then
+        sed_inplace 's/CommandLineToArgvW(GetCommandLineW(), &wargc)/nullptr/' "$f"
+        log "patched Windows process-command-line override: $f"
+    fi
+done
+
 # ---------------------------------------------------------------------------
 # 3. CMake configure + build (engine sources globbed by native/CMakeLists.txt)
 # ---------------------------------------------------------------------------
@@ -177,36 +191,46 @@ case "$PLATFORM" in
 esac
 
 # ---------------------------------------------------------------------------
-# 4. Collect outputs + GPL build info
+# 4. Collect outputs, strip symbols, verify runtime dependencies
 # ---------------------------------------------------------------------------
 case "$PLATFORM" in
     windows) find native/build -name 'chuying_*.dll'   -exec cp {} native/dist/ \; ;;
     linux)   find native/build -name 'chuying_*.so'    -exec cp {} native/dist/ \; ;;
     macos)   find native/build -name 'chuying_*.dylib' -exec cp {} native/dist/ \; ;;
 esac
-ls -la native/dist/
 [ -n "$(ls native/dist/chuying_* 2>/dev/null)" ] || { log "ERROR: no chuying_* outputs"; exit 1; }
+
+log "stripping symbols"
+case "$PLATFORM" in
+    macos) find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip -x {} \; || true ;;
+    *)     find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip --strip-unneeded {} \; || true ;;
+esac
+
+# The shipped library must not need the MinGW runtime DLLs at load time: they are
+# absent both on the CI runners and on end users' machines, and a missing
+# dependency makes System.load() fail inside the JVM.
+if [ "$PLATFORM" = "windows" ]; then
+    log "checking runtime dependencies"
+    bad=0
+    for f in native/dist/chuying_*.dll; do
+        objdump -p "$f" | grep -i 'DLL Name' || true
+        if objdump -p "$f" | grep -qiE 'libwinpthread|libstdc\+\+|libgcc'; then
+            log "ERROR: $f still imports the MinGW runtime"
+            bad=1
+        fi
+    done
+    [ "$bad" -eq 0 ] || exit 1
+fi
+
+ls -la native/dist/
 
 cat > native/dist/BUILD_INFO.txt <<EOF
 platform: $PLATFORM
 built_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0)
+stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); NNUE nets embedded at build time
 pikafish:  https://github.com/official-pikafish/Pikafish $PF_SHA (GPL-3.0)
 rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0)
 bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams
 EOF
 
-# Ship the Stockfish NNUE nets (used at runtime via EvalFile; not embedded on MSVC).
-# Split into 10MB chunks: flaky proxies kill big single transfers; chunks reassemble locally.
-log "packaging NNUE nets (split 10MB)"
-mkdir -p native/dist/nets
-for net in "$ENGINES/stockfish/src/"nn-*.nnue; do
-    [ -e "$net" ] || continue
-    base=$(basename "$net")
-    sha12=$(sha256sum "$net" | cut -c1-12)
-    stem="${base%.nnue}"; stem="${stem#nn-}"
-    [ "$stem" = "$sha12" ] || log "WARN: $base hash mismatch ($sha12)"
-    split -b 10m -d "$net" "native/dist/nets/$base.part."
-done
-ls -la native/dist/nets/ | head -20
 log "done"

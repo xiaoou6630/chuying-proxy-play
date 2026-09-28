@@ -42,10 +42,12 @@ public class LocalCheck {
         if (!ready) { log("FAIL: no readyok (net rejected?)"); System.exit(1); }
 
         e.send("position startpos moves e2e4 e7e5 g1f3");
-        log("sending go depth " + depth);
+        // depth 0 = probe eval only (isolates NNUE from search/threading)
+        String cmd = depth == 0 ? "eval" : "go depth " + depth;
+        log("sending " + cmd);
         System.out.flush();
-        e.send("go depth " + depth);
-        log("go sent, reading...");
+        e.send(cmd);
+        log(cmd + " sent, reading...");
         System.out.flush();
         boolean best = false, scored = false;
         t0 = System.currentTimeMillis();
