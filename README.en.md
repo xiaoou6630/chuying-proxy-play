@@ -27,6 +27,7 @@ An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) o
 | **Avoid Draw (Chess)** | Push Stockfish to actively seek the win instead of settling for a draw |
 | **Auto-extract engines** | Bundled Windows / Linux / macOS native libraries, extracted to `config/chuying/engines/` on first run |
 | **Shogi support** | With the `tlm_shogi` addon installed, shogi is played for you too (using its bundled Sunfish, zero extra size) |
+| **ChessPVP support** | With the `ChessPVP` addon installed, PVP games are played for you too: only your own side is played (requires that addon's sneak-click interaction) |
 | **Multi-language** | Simplified Chinese, English, 日本語 |
 | **Debug HELL** | Force the Gomoku maid to HELL difficulty (client-only, for testing) |
 
@@ -70,6 +71,7 @@ One build produces three jars — pick the one for your OS (don't mix them up):
 - Press **K** to toggle proxy play (remappable in Options → Controls)
 - Walk up to a board, **keep your main hand empty** (the board requires an empty hand), and moves are made for you
 - The same works for shogi boards (needs the `tlm_shogi` addon); promotion choices are answered automatically
+- The same works with the `ChessPVP` addon: it only plays once both players joined and it is your side's turn (red/white or black); spectators stay out
 - Settings → Mods → Chuying Proxy Play → Config:
   - **Think Strength**: LOW (sandbag) → DEFAULT → HIGH → MAX (higher = steadier, fewer blunders); shogi uses the same tiers (DEFAULT = 10s / depth 20, far above the maid's own level)
   - **Avoid Draw** (Chess only): OFF / GENTLE / ACTIVE / MAX — avoid forced draws

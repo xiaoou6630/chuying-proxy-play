@@ -16,6 +16,7 @@
   "chuying.configuration.avoidDraw.AGGRESSIVE": "极致",
   "chuying.configuration.debugForceMaxMaid": "调试：强制五子棋女仆最高难度 HELL",
   "chuying.configuration.shogiEnabled": "将棋代打（需 tlm_shogi 扩展）",
+  "chuying.configuration.pvpEnabled": "棋圣 PVP 代打（需棋圣 ChessPVP）",
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "切换代打开关",

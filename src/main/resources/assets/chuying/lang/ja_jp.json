@@ -16,6 +16,7 @@
   "chuying.configuration.avoidDraw.AGGRESSIVE": "極限",
   "chuying.configuration.debugForceMaxMaid": "デバッグ：五目並べのメイドを最高難易度 HELL に強制",
   "chuying.configuration.shogiEnabled": "将棋代打（tlm_shogi 拡張が必要）",
+  "chuying.configuration.pvpEnabled": "棋聖 PVP 代打（棋聖 ChessPVP が必要）",
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "代打の切り替え",

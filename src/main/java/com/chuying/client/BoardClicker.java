@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
@@ -42,6 +43,12 @@ public final class BoardClicker {
      * </ul>
      */
     private static final Set<String> SKIP_BLOCK_IDS = Set.of("tlm_shogi:jchess");
+
+    // ---- PVP 代打的潜行会话（棋圣要求服务端认为玩家在潜行，否则点击无效） ----
+    /** 当前是否处于代打潜行会话（已按需发送 PRESS_SHIFT_KEY 且尚未还原） */
+    private static boolean pvpSneakActive = false;
+    /** 会话开始前玩家是否本来就按着 shift（是则不发送任何潜行包、结束时也不还原） */
+    private static boolean pvpSneakPlayerWasSneaking = false;
 
     /** 五子棋 9 个 part 的偏移参数（顺序：上行→中行→下行，每行左→中→右） */
     private record GPart(GomokuPart part, double xStart, int xIdxOff, double yStart, int yIdxOff) {
@@ -115,6 +122,41 @@ public final class BoardClicker {
         }
         Chuying.LOGGER.info("[chuying] click pos={} hit={}", bhr.getBlockPos(), bhr.getLocation());
         mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, bhr);
+    }
+
+    /**
+     * 进入 PVP 代打的潜行会话：棋圣的 {@code useItemOn} 注入在 HEAD，非潜行点击一律无效，
+     * 因此代打前必须让<b>服务端</b>认为玩家在潜行。若玩家本来就按着 shift 则不发任何包。
+     */
+    public static void beginPvpSneak() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.getConnection() == null) {
+            return;
+        }
+        if (!pvpSneakActive) {
+            pvpSneakActive = true;
+            pvpSneakPlayerWasSneaking = mc.player.isShiftKeyDown();
+        }
+        if (!pvpSneakPlayerWasSneaking) {
+            mc.getConnection().send(new ServerboundPlayerCommandPacket(
+                    mc.player, ServerboundPlayerCommandPacket.Action.PRESS_SHIFT_KEY));
+        }
+    }
+
+    /** 结束 PVP 代打的潜行会话并还原（玩家本来就按着 shift 时不还原） */
+    public static void endPvpSneak() {
+        if (!pvpSneakActive) {
+            return;
+        }
+        pvpSneakActive = false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.getConnection() == null) {
+            return;
+        }
+        if (!pvpSneakPlayerWasSneaking) {
+            mc.getConnection().send(new ServerboundPlayerCommandPacket(
+                    mc.player, ServerboundPlayerCommandPacket.Action.RELEASE_SHIFT_KEY));
+        }
     }
 
     /**

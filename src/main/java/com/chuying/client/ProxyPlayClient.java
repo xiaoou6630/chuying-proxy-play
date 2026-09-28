@@ -2,6 +2,7 @@ package com.chuying.client;
 
 import com.chuying.Chuying;
 import com.chuying.Config;
+import com.chuying.compat.ChessPvpCompat;
 import com.chuying.compat.ShogiCompat;
 import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
@@ -58,11 +59,28 @@ public class ProxyPlayClient {
     private static final class PendingClick {
         final BlockHitResult hit;
         int delayTicks;
+        /** PVP 代打：本轮点击需服务端处于潜行态才生效 */
+        final boolean sneak;
 
         PendingClick(BlockHitResult hit, int delayTicks) {
+            this(hit, delayTicks, false);
+        }
+
+        PendingClick(BlockHitResult hit, int delayTicks, boolean sneak) {
             this.hit = hit;
             this.delayTicks = delayTicks;
+            this.sneak = sneak;
         }
+    }
+
+    /** PVP 判定结果 */
+    private enum PvpDecision {
+        /** 非 PVP 对局（未装棋圣/未开启/非 PVP 棋盘）：走原有 isPlayerTurn 逻辑 */
+        NON_PVP,
+        /** PVP 对局且轮到我方：代打需带潜行 */
+        MY_TURN,
+        /** PVP 对局但未轮到/未双方加入/我只是旁观者：不代打 */
+        SKIP
     }
 
     @SubscribeEvent
@@ -158,16 +176,67 @@ public class ProxyPlayClient {
 
     private static void processPendingClicks() {
         if (PENDING_CLICKS.isEmpty()) {
+            // 队列清空即结束 PVP 潜行会话，还原玩家的 shift 状态
+            BoardClicker.endPvpSneak();
             return;
+        }
+        // 队列里只要还有 PVP 点击，就保持服务端处于潜行态
+        for (PendingClick pc : PENDING_CLICKS) {
+            if (pc.sneak) {
+                BoardClicker.beginPvpSneak();
+                break;
+            }
         }
         var it = PENDING_CLICKS.iterator();
         while (it.hasNext()) {
             PendingClick pc = it.next();
             if (pc.delayTicks-- <= 0) {
+                if (pc.sneak) {
+                    // 每个点击发送前都确保服务端潜行（两步点击可能跨 tick）
+                    BoardClicker.beginPvpSneak();
+                }
                 BoardClicker.sendUseItemOn(pc.hit);
                 it.remove();
             }
         }
+        if (PENDING_CLICKS.isEmpty()) {
+            BoardClicker.endPvpSneak();
+        }
+    }
+
+    /**
+     * PVP 判定（象棋：中国象棋/国际象棋）：非 PVP 返回 {@link PvpDecision#NON_PVP}；
+     * PVP 且轮到我方返回 {@code MY_TURN}，否则 {@code SKIP}。
+     */
+    private static PvpDecision pvpDecision(Minecraft mc, BlockEntity te, boolean tlmIsPlayerTurn) {
+        if (!Config.PVP_ENABLED.get() || !ChessPvpCompat.isAvailable() || mc.player == null) {
+            return PvpDecision.NON_PVP;
+        }
+        ChessPvpCompat.PvpState state = ChessPvpCompat.read(te);
+        if (state == null) {
+            return PvpDecision.NON_PVP;
+        }
+        if (!state.bothJoined()) {
+            return PvpDecision.SKIP;
+        }
+        ChessPvpCompat.Side side = ChessPvpCompat.mySide(state, mc.player.getUUID());
+        return ChessPvpCompat.isMyTurn(state, side, tlmIsPlayerTurn) ? PvpDecision.MY_TURN : PvpDecision.SKIP;
+    }
+
+    /** PVP 判定（五子棋：用 {@code ChessPvpTurn} 判断回合，不用 isPlayerTurn） */
+    private static PvpDecision pvpDecisionGomoku(Minecraft mc, BlockEntity te) {
+        if (!Config.PVP_ENABLED.get() || !ChessPvpCompat.isAvailable() || mc.player == null) {
+            return PvpDecision.NON_PVP;
+        }
+        ChessPvpCompat.PvpState state = ChessPvpCompat.read(te);
+        if (state == null) {
+            return PvpDecision.NON_PVP;
+        }
+        if (!state.bothJoined()) {
+            return PvpDecision.SKIP;
+        }
+        ChessPvpCompat.Side side = ChessPvpCompat.mySide(state, mc.player.getUUID());
+        return ChessPvpCompat.isMyTurnGomoku(state, side) ? PvpDecision.MY_TURN : PvpDecision.SKIP;
     }
 
     private static void tryShogi(Minecraft mc, BlockPos center, Direction facing, Object te) {
@@ -238,7 +307,13 @@ public class ProxyPlayClient {
         }
         ProxyPlayState.lastCChessCounter = counter;
 
-        if (!c.isPlayerTurn() || c.isCheckmate() || c.isMoveNumberLimit() || c.isRepeat()) {
+        // PVP：棋圣对局只在轮到本客户端那一方时动手（象棋用 isPlayerTurn 表示 P1 回合）
+        PvpDecision pvp = pvpDecision(mc, c, c.isPlayerTurn());
+        if (pvp == PvpDecision.SKIP) {
+            return;
+        }
+        boolean myTurn = pvp == PvpDecision.MY_TURN || c.isPlayerTurn();
+        if (!myTurn || c.isCheckmate() || c.isMoveNumberLimit() || c.isRepeat()) {
             Chuying.LOGGER.info("[chuying] cchess skip: turn={} mate={} limit={} repeat={}",
                     c.isPlayerTurn(), c.isCheckmate(), c.isMoveNumberLimit(), c.isRepeat());
             return;
@@ -254,8 +329,10 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fen);
+        // PVP 下引擎拿到的是「轮走方」的局面（FEN 走子方与棋圣回合一致），故 bestmove 即为该方着法
+        final boolean sneak = pvp == PvpDecision.MY_TURN;
         int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
-        Chuying.LOGGER.info("[chuying] cchess trigger fen={} center={} facing={}", fen, center, facing);
+        Chuying.LOGGER.info("[chuying] cchess trigger fen={} center={} facing={} pvp={}", fen, center, facing, sneak);
         CompletableFuture.runAsync(() -> {
             try {
                 String uci = engine.bestMove(fen, thinkMs);
@@ -269,7 +346,7 @@ public class ProxyPlayClient {
                 }
                 int fromSq = Position.SRC(move);
                 int toSq = Position.DST(move);
-                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, true));
+                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, true, sneak));
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -284,7 +361,13 @@ public class ProxyPlayClient {
         }
         ProxyPlayState.lastWChessCounter = counter;
 
-        if (!w.isPlayerTurn() || w.isCheckmate() || w.isMoveNumberLimit() || w.isRepeat()) {
+        // PVP：棋圣对局只在轮到本客户端那一方时动手（国象用 isPlayerTurn 表示 P1 回合）
+        PvpDecision pvp = pvpDecision(mc, w, w.isPlayerTurn());
+        if (pvp == PvpDecision.SKIP) {
+            return;
+        }
+        boolean myTurn = pvp == PvpDecision.MY_TURN || w.isPlayerTurn();
+        if (!myTurn || w.isCheckmate() || w.isMoveNumberLimit() || w.isRepeat()) {
             Chuying.LOGGER.info("[chuying] wchess skip: turn={} mate={} limit={} repeat={}",
                     w.isPlayerTurn(), w.isCheckmate(), w.isMoveNumberLimit(), w.isRepeat());
             return;
@@ -300,8 +383,10 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fen);
+        // PVP 下引擎拿到的是「轮走方」的局面（FEN 走子方与棋圣回合一致），故 bestmove 即为该方着法
+        final boolean sneak = pvp == PvpDecision.MY_TURN;
         int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
-        Chuying.LOGGER.info("[chuying] wchess trigger fen={} center={} facing={}", fen, center, facing);
+        Chuying.LOGGER.info("[chuying] wchess trigger fen={} center={} facing={} pvp={}", fen, center, facing, sneak);
         CompletableFuture.runAsync(() -> {
             try {
                 String uci = engine.bestMove(fen, thinkMs);
@@ -315,7 +400,7 @@ public class ProxyPlayClient {
                 }
                 int fromSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.SRC(move);
                 int toSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.DST(move);
-                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, false));
+                mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, false, sneak));
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -330,7 +415,13 @@ public class ProxyPlayClient {
         }
         ProxyPlayState.lastGomokuCounter = counter;
 
-        if (!g.isPlayerTurn() || g.getStatue() != Statue.IN_PROGRESS) {
+        // PVP：棋圣五子棋用 ChessPvpTurn 判回合（P1 黑 / P2 白），不用 isPlayerTurn
+        PvpDecision pvp = pvpDecisionGomoku(mc, g);
+        if (pvp == PvpDecision.SKIP) {
+            return;
+        }
+        boolean myTurn = pvp == PvpDecision.MY_TURN || g.isPlayerTurn();
+        if (!myTurn || g.getStatue() != Statue.IN_PROGRESS) {
             return;
         }
         byte[][] board = g.getChessData();
@@ -360,6 +451,7 @@ public class ProxyPlayClient {
             return;
         }
         claimPosition(fp);
+        final boolean sneak = pvp == PvpDecision.MY_TURN;
         int thinkMs = Config.THINK_TIME.get() * Config.STRENGTH.get().multiplier;
         CompletableFuture.runAsync(() -> {
             try {
@@ -369,21 +461,22 @@ public class ProxyPlayClient {
                 }
                 int x = xy[0];
                 int y = xy[1];
-                mc.execute(() -> BoardClicker.sendUseItemOn(BoardClicker.gomokuHit(center, x, y)));
+                mc.execute(() -> PENDING_CLICKS.add(
+                        new PendingClick(BoardClicker.gomokuHit(center, x, y), 0, sneak)));
             } finally {
                 ProxyPlayState.busy = false;
             }
         }, Util.backgroundExecutor());
     }
 
-    /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格 */
-    private static void scheduleChessMove(BlockPos center, Direction facing, int fromSq, int toSq, boolean cchess) {
+    /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格；sneak 为 PVP 潜行标记 */
+    private static void scheduleChessMove(BlockPos center, Direction facing, int fromSq, int toSq, boolean cchess, boolean sneak) {
         BlockHitResult fromHit = chessHit(center, facing, fromSq, cchess);
         BlockHitResult toHit = chessHit(center, facing, toSq, cchess);
-        Chuying.LOGGER.info("[chuying] {} move fromSq={} toSq={} fromHit={} toHit={}",
-                cchess ? "cchess" : "wchess", fromSq, toSq, fromHit.getLocation(), toHit.getLocation());
-        PENDING_CLICKS.add(new PendingClick(fromHit, 0));
-        PENDING_CLICKS.add(new PendingClick(toHit, CHESS_STEP_DELAY_TICKS));
+        Chuying.LOGGER.info("[chuying] {} move fromSq={} toSq={} fromHit={} toHit={} sneak={}",
+                cchess ? "cchess" : "wchess", fromSq, toSq, fromHit.getLocation(), toHit.getLocation(), sneak);
+        PENDING_CLICKS.add(new PendingClick(fromHit, 0, sneak));
+        PENDING_CLICKS.add(new PendingClick(toHit, CHESS_STEP_DELAY_TICKS, sneak));
     }
 
     private static BlockHitResult chessHit(BlockPos center, Direction facing, int sq, boolean cchess) {

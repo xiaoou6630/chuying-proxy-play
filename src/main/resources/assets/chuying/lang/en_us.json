@@ -16,6 +16,7 @@
   "chuying.configuration.avoidDraw.AGGRESSIVE": "AGGRESSIVE",
   "chuying.configuration.debugForceMaxMaid": "Debug: Force Gomoku Maid to HELL difficulty",
   "chuying.configuration.shogiEnabled": "Shogi Proxy Play (requires tlm_shogi)",
+  "chuying.configuration.pvpEnabled": "ChessPVP Proxy Play (requires ChessPVP)",
 
   "key.category.chuying": "Chuying Proxy Play",
   "key.chuying.proxy_play": "Toggle Proxy Play",

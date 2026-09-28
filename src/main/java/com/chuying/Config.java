@@ -81,6 +81,11 @@ public final class Config {
             .comment("将棋代打开关：默认开启。需要安装 tlm_shogi 将棋扩展；未安装时自动禁用，不影响其它棋种。")
             .define("shogiEnabled", true);
 
+    /** 棋圣 PVP 联动开关：默认开启；仅装了棋圣 ChessPVP 时生效，未安装时自动禁用 */
+    public static final ModConfigSpec.BooleanValue PVP_ENABLED = BUILDER
+            .comment("棋圣 ChessPVP 联动开关：默认开启。仅装了棋圣 ChessPVP 时生效（只替自己对局中的那一方代打）；未安装时自动禁用，不影响其它功能。")
+            .define("pvpEnabled", true);
+
     /** 调试：强制五子棋女仆最高难度 HELL（纯客户端 Mixin）。默认关闭，测试用 */
     public static final ModConfigSpec.BooleanValue DEBUG_FORCE_MAX_MAID = BUILDER
             .comment("调试：强制五子棋女仆用最高难度 HELL（纯客户端，不改任何服务端数据）。默认关闭。")

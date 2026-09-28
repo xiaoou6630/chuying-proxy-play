@@ -111,6 +111,15 @@ config="${mod_id}.mixins.json"
     ordering="AFTER"
     side="CLIENT"
 
+# 棋圣 ChessPVP —— 软依赖：装了才启用 PVP 代打（只替自己在对局中的那一方）
+# （纯反射调用，未安装时 PVP 联动整体禁用，其余棋类与功能不受影响）
+[[dependencies.${mod_id}]]
+    modId="chesspvp"
+    type="optional"
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="CLIENT"
+
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares
 # that your mod requires GL version 3.2 or higher. Other features will be added. They are side aware so declaring this won't
 # stop your mod loading on the server for example.
