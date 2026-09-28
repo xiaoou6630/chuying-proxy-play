@@ -39,7 +39,19 @@ PF_SHA=$(git_clone https://github.com/official-pikafish/Pikafish.git  "$ENGINES/
 RF_SHA=$(git_clone https://github.com/dhbloo/rapfi.git                "$ENGINES/rapfi"      250615    | awk '{print $NF}')
 
 # ---------------------------------------------------------------------------
-# 2. Patch: int main(...) -> engine_main(...) so the engine can run in-thread.
+# 2. Patch CMakeLists: add_executable -> add_library STATIC (Rapfi uses its
+#    own CMakeLists with bundled externals; Stockfish/Pikafish have none)
+# ---------------------------------------------------------------------------
+log "patching CMakeLists (add_executable -> add_library STATIC)"
+find "$ENGINES" -name CMakeLists.txt | while read -r f; do
+    if grep -q 'add_executable(' "$f"; then
+        sed_inplace 's/add_executable(\([A-Za-z0-9_.-]*\)/add_library(\1 STATIC/g' "$f"
+        echo "patched: $f"
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# 3. Patch: int main(...) -> engine_main(...) so the engine can run in-thread.
 #    Pikafish keeps extra universal-entry mains -> disable them.
 # ---------------------------------------------------------------------------
 rename_mains() { # dir want_substring
@@ -78,6 +90,10 @@ rename_mains "$ENGINES/rapfi/Rapfi"   pbrain
 # 3. CMake configure + build (engine sources globbed by native/CMakeLists.txt)
 # ---------------------------------------------------------------------------
 CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
+# Rapfi: lock SIMD to SSE baseline (its own CMake auto-detects host with -march=native)
+CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
+             -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+             -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF)
 if [ "$PLATFORM" = "macos" ]; then
     CMAKE_ARGS+=(-DCMAKE_OSX_ARCHITECTURES=arm64)
 fi

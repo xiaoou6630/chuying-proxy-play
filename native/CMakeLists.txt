@@ -15,7 +15,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded") # static CRT: keep iostream state per-DLL
-    add_compile_options(/utf-8 /EHsc)
+    add_compile_options(/utf-8 /EHsc /Zc:lambda)    # /Zc:lambda: fix C3493 on Stockfish lambdas
     add_compile_definitions(USE_SSE2) # x64 MSVC has SSE2 baseline (POPcnt left off: safe fallback)
 else()
     find_package(Threads REQUIRED)
@@ -46,9 +46,10 @@ file(GLOB_RECURSE SF_SRCS CONFIGURE_DEPENDS engines/stockfish/src/*.cpp)
 file(GLOB_RECURSE PF_SRCS CONFIGURE_DEPENDS engines/pikafish/src/*.cpp)
 list(FILTER PF_SRCS EXCLUDE REGEX "pikafish/src/universal/")
 
-file(GLOB_RECURSE RF_SRCS CONFIGURE_DEPENDS engines/rapfi/Rapfi/src/*.cpp)
-list(APPEND RF_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/main.cpp)
-file(GLOB RF_LZ4 CONFIGURE_DEPENDS engines/rapfi/Rapfi/lz4/*.c)
+# Rapfi: use its own CMakeLists (bundled externals: cpptoml/cxxopts/lz4/simde/zip...)
+# CI patches add_executable(rapfi -> add_library(rapfi STATIC, and main.cpp -> engine_main.
+# SIMD locked to SSE baseline for portability (see build_native.sh CMAKE_ARGS).
+add_subdirectory(engines/rapfi/Rapfi rf_build)
 
 function(chuying_bridge name)
     cmake_parse_arguments(ARG "" "" "SOURCES;INCLUDES" ${ARGN})
@@ -69,7 +70,4 @@ chuying_bridge(chuying_pikafish
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
 
 chuying_bridge(chuying_rapfi
-    SOURCES ${RF_SRCS} ${RF_LZ4}
-    INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/src
-             ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi
-             ${CMAKE_CURRENT_SOURCE_DIR}/engines/rapfi/Rapfi/lz4)
+    SOURCES rapfi)
