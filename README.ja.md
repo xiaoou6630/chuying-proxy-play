@@ -46,9 +46,9 @@
 
 | ファイル | 対応OS |
 |---|---|
-| `Chuying Proxy Play<バージョン>-NeoForge-1.21.1-windows.jar` | Windows |
-| `Chuying Proxy Play<バージョン>-NeoForge-1.21.1-linux.jar` | Linux（x86-64, AVX2） |
-| `Chuying Proxy Play<バージョン>-NeoForge-1.21.1-macos.jar` | macOS（Apple Silicon） |
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-macos.jar` | macOS（Apple Silicon） |
 
 > エンジンは初回起動時に `config/chuying/engines/` へ自動展開されます。手動設定は不要です。
 
@@ -99,7 +99,7 @@ UI・メッセージは簡体字中国語・English・日本語に対応し、�
 ./gradlew build
 ```
 
-生成物は `build/libs/`：`chuying-<version>.jar`（骨格）+ `Chuying Proxy Play<バージョン>-NeoForge-1.21.1-{windows,linux,macos}.jar`。
+生成物は `build/libs/`：`chuying-<version>.jar`（骨格）+ `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-{windows,linux,macos}.jar`。
 
 ## ライセンス
 

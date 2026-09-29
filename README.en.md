@@ -46,9 +46,9 @@ One build produces three jars — pick the one for your OS (don't mix them up):
 
 | File | OS |
 |---|---|
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-windows.jar` | Windows |
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-linux.jar` | Linux (x86-64, AVX2) |
-| `Chuying Proxy Play<ver>-NeoForge-1.21.1-macos.jar` | macOS (Apple Silicon) |
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-linux.jar` | Linux (x86-64, AVX2) |
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-macos.jar` | macOS (Apple Silicon) |
 
 > Engines are extracted automatically to `config/chuying/engines/` on first run.
 
@@ -99,7 +99,7 @@ Engine binaries are not committed to git; the GitHub Actions `native-build` work
 ./gradlew build
 ```
 
-Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `Chuying Proxy Play<version>-NeoForge-1.21.1-{windows,linux,macos}.jar`.
+Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `Chuying.Proxy.Play<version>-NeoForge-1.21.1-{windows,linux,macos}.jar`.
 
 ## License
 
