@@ -7,7 +7,6 @@
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
 ![Forge](https://img.shields.io/badge/Forge-47%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-ダウンロード-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
 **Forge 1.20.1** 向け [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) のアドオン。メイドの盤上対局で自分の手番になると、内蔵エンジンが自動的に打ってくれます。
@@ -44,9 +43,9 @@
 
 | ファイル | 対応OS |
 |---|---|
-| `Chuying Proxy Play<バージョン>-Forge-1.20.1-windows.jar` | Windows |
-| `Chuying Proxy Play<バージョン>-Forge-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
-| `Chuying Proxy Play<バージョン>-Forge-1.20.1-macos.jar` | macOS（Apple Silicon） |
+| `Chuying.Proxy.Play<バージョン>-Forge-1.20.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<バージョン>-Forge-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying.Proxy.Play<バージョン>-Forge-1.20.1-macos.jar` | macOS（Apple Silicon） |
 
 > エンジンは初回起動時に `config/chuying/engines/` へ自動展開されます。手動設定は不要です。
 
@@ -93,7 +92,7 @@ UI・メッセージは簡体字中国語・English・日本語に対応し、�
 ./gradlew build
 ```
 
-生成物は `build/libs/`：`chuying-<version>.jar`（骨格）+ `Chuying Proxy Play<バージョン>-Forge-1.20.1-{windows,linux,macos}.jar`。
+生成物は `build/libs/`：`chuying-<version>.jar`（骨格）+ `Chuying.Proxy.Play<バージョン>-Forge-1.20.1-{windows,linux,macos}.jar`。
 
 ## ライセンス
 

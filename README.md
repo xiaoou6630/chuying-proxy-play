@@ -53,6 +53,13 @@
 - Forge `47+`（Minecraft 1.20.1）
 - [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) 1.20.1 —— 客户端与服务端都需要（棋盘来自它）
 
+## 安装
+
+1. 安装 Forge 1.20.1 与 Touhou Little Maid
+2. 从 Releases 下载与**系统**匹配的 jar
+3. 放入 `.minecraft/mods/`
+4. 启动游戏
+
 ## 使用
 
 - 按 **K** 开启/关闭代打（可在 设置 → 控制 → 按键绑定 修改）
@@ -60,9 +67,34 @@
 - 装了棋圣 `ChessPVP` 时同样适用：只在双方都加入、且轮到你所属那一方时代打
 - 设置 → 模组 → 褚嬴代打：**思考强度**（低 → 极致）、**避和强度**（仅国象）
 
+## 纯客户端原理
+
+- 引擎在客户端本地算招，把走法逆推为棋盘交叉点的 3D 命中坐标，用**原版** `ServerboundUseItemOnPacket`（模拟右键）发送
+- 服务器只当玩家在正常点击棋盘，由它已装的 TLM 完成落子 —— **服务器零改动、零依赖**
+- 中国象棋/国际象棋为“选子→落子”两步模拟点击，五子棋按棋盘分块偏移换算后点击
+- 引擎侧：三家引擎的 `main()` 在构建期被重命名并链接进 JNI 原生库，`std::cin`/`std::cout` 被重定向到内存队列，因此**在游戏进程内跑完整 UCI/pbrain 循环，全程不创建进程**
+
+## 国际化
+
+界面与提示支持简体中文、English、日本語，随游戏语言自动切换。
+
 ## 引擎内存说明
 
 引擎采用**懒加载**：首次走子才加载，未触发代打前零引擎内存占用；关闭代打后引擎常驻到游戏退出（退出游戏自动全部释放）。
+
+> 注：JNI 原生库一旦加载便无法在进程内卸载，因此关闭代打后库代码段与已内嵌的 NNUE 权重仍驻留内存，直到退出游戏。
+
+## 开发者：本地构建
+
+引擎二进制不进 git 仓库：由 GitHub Actions `native-build` 工作流在 CI 上拉取引擎源码、编译成三平台 JNI 原生库并上传 artifact；下载后放进 `src/main/resources/engines/<平台>/`，权重等数据文件放 `engines/shared/`。
+
+```bash
+# 1. 把 CI 产物 chuying_*.dll|so|dylib 放进 src/main/resources/engines/{windows,linux,macos}/
+# 2. 一次构建出三版 jar
+./gradlew build
+```
+
+产物在 `build/libs/`：`chuying-<版本>.jar`（骨架）+ `Chuying.Proxy.Play<版本>-Forge-1.20.1-{windows,linux,macos}.jar`。
 
 ## 许可证
 
