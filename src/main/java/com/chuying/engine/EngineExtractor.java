@@ -134,16 +134,15 @@ public final class EngineExtractor {
      * {@code prefix} 是 jar 内资源前缀（含 engines/ 与平台/shared 段），
      * 剥离后剩余的相对路径再 resolve 到 {@code targetRoot}。
      * <p>
-     * 覆盖规则：目标文件与 jar 内同名资源<b>大小一致才跳过</b>，大小不同就覆盖。
+     * 覆盖规则：目标文件与 jar 内同名资源<b>内容一致才跳过</b>（逐字节比对），不同就覆盖。
      * 早期版本是「存在即跳过」，结果引擎升级后旧权重留在原地（Pikafish 权重与引擎不匹配
-     * 会直接 std::exit 杀掉 JVM），故改为按大小比对。
+     * 会直接 std::exit 杀掉 JVM）；再早的「只比大小」在两轮构建大小恰好相同时会漏更新。
      */
     private static void extractResources(List<String> resources, Path targetRoot, String prefix) {
         for (String res : resources) {
             String rel = res.substring(prefix.length());
             Path target = targetRoot.resolve(rel.replace('/', java.io.File.separatorChar));
-            long expected = resourceSize(res);
-            if (expected > 0 && sameSize(target, expected)) {
+            if (sameContent(target, res)) {
                 continue;
             }
             try (InputStream in = EngineExtractor.class.getResourceAsStream("/" + res)) {
@@ -155,32 +154,41 @@ public final class EngineExtractor {
                 Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
                 Chuying.LOGGER.info("解压内置引擎资源: {}", target);
             } catch (IOException e) {
-                Chuying.LOGGER.error("解压引擎资源失败: {}", res, e);
+                // 典型场景：游戏仍在运行时旧 DLL 被加载锁定（AccessDenied）。
+                // 此时盘上留的是旧库，加载后若符号不匹配会在引擎初始化时报错，便于定位。
+                Chuying.LOGGER.error("解压引擎资源失败（若为文件被占用，请关闭所有游戏实例后重试）: {}", res, e);
             }
         }
     }
 
-    /** jar 内资源未压缩大小；拿不到（开发环境为目录形式）返回 -1 */
-    private static long resourceSize(String res) {
-        try {
-            java.net.URL url = EngineExtractor.class.getResource("/" + res);
-            if (url == null) {
-                return -1L;
-            }
-            java.net.URLConnection conn = url.openConnection();
-            if (conn instanceof java.net.JarURLConnection) {
-                java.util.jar.JarEntry entry = ((java.net.JarURLConnection) conn).getJarEntry();
-                return entry == null ? -1L : entry.getSize();
-            }
-        } catch (Exception ignored) {
+    /**
+     * 逐字节比对盘上文件与 jar 内资源是否完全一致。
+     * <p>
+     * 早期版本只比文件大小——两轮 CI 构建的 DLL 剥离符号后大小可能恰好相同而
+     * 内容不同（本次真实发生：旧 DLL 永远无法被新 jar 覆盖，新代码加载旧库
+     * UnsatisfiedLinkError），必须按内容判断。
+     */
+    private static boolean sameContent(Path diskFile, String resource) {
+        if (!Files.exists(diskFile)) {
+            return false;
         }
-        return -1L;
-    }
-
-    private static boolean sameSize(Path file, long expected) {
-        try {
-            return Files.exists(file) && Files.size(file) == expected;
-        } catch (IOException e) {
+        try (InputStream in = EngineExtractor.class.getResourceAsStream("/" + resource)) {
+            if (in == null) {
+                return false;
+            }
+            try (InputStream disk = Files.newInputStream(diskFile)) {
+                byte[] bufA = new byte[8192];
+                byte[] bufB = new byte[8192];
+                int n;
+                while ((n = in.read(bufA)) != -1) {
+                    int m = disk.readNBytes(bufB, 0, n);
+                    if (m != n || !java.util.Arrays.equals(bufA, 0, n, bufB, 0, m)) {
+                        return false;
+                    }
+                }
+                return disk.read() == -1;
+            }
+        } catch (Exception e) {
             return false;
         }
     }

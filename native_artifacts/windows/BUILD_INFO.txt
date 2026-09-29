@@ -1,0 +1,7 @@
+platform: windows
+built_utc: 2026-09-29T02:08:11Z
+stockfish: https://github.com/official-stockfish/Stockfish 03e27488f3d21d8ff4dbf3065603afa21dbd0ef3 (GPL-3.0); NNUE nets embedded at build time
+pikafish:  https://github.com/official-pikafish/Pikafish b562d6aeac5401879e973dc53ddb56053f07bb6a (GPL-3.0)
+pikafish_net_sha256: 7d13d73569a9b571ba0eb20cf1596247bc2a42738967e61afef6482b231e900e
+rapfi:     https://github.com/dhbloo/rapfi 1be1551ced57e38d53ed58f6d74bf6f8b4bdc230 (GPL-3.0); built single-threaded (NO_MULTI_THREADING)
+bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams

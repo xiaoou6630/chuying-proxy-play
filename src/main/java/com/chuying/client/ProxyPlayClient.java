@@ -269,6 +269,8 @@ public class ProxyPlayClient {
                     return;
                 }
                 mc.execute(() -> scheduleShogiMove(center, facing, te, usi));
+            } catch (Throwable t) {
+                Chuying.LOGGER.error("[chuying] shogi 代打异常", t);
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -347,6 +349,8 @@ public class ProxyPlayClient {
                 int fromSq = Position.SRC(move);
                 int toSq = Position.DST(move);
                 mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, true, sneak));
+            } catch (Throwable t) {
+                Chuying.LOGGER.error("[chuying] cchess 代打异常", t);
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -401,6 +405,8 @@ public class ProxyPlayClient {
                 int fromSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.SRC(move);
                 int toSq = com.github.tartaricacid.touhoulittlemaid.api.game.chess.Position.DST(move);
                 mc.execute(() -> scheduleChessMove(center, facing, fromSq, toSq, false, sneak));
+            } catch (Throwable t) {
+                Chuying.LOGGER.error("[chuying] wchess 代打异常", t);
             } finally {
                 ProxyPlayState.busy = false;
             }
@@ -463,6 +469,8 @@ public class ProxyPlayClient {
                 int y = xy[1];
                 mc.execute(() -> PENDING_CLICKS.add(
                         new PendingClick(BoardClicker.gomokuHit(center, x, y), 0, sneak)));
+            } catch (Throwable t) {
+                Chuying.LOGGER.error("[chuying] gomoku 代打异常", t);
             } finally {
                 ProxyPlayState.busy = false;
             }

@@ -76,12 +76,15 @@ public final class NativeUciEngine implements AutoCloseable {
         }
         try {
             load();
-        } catch (UnsatisfiedLinkError e) {
-            Chuying.LOGGER.error("原生引擎库加载失败: {}", libPath, e);
-            return false;
-        }
-        if (start(new String[0]) != 0) {
-            Chuying.LOGGER.error("原生引擎启动失败: {}", libPath);
+            // 注意：JNI 符号绑定是惰性的——System.load 成功不代表符号存在。
+            // 若盘上是旧版 DLL（导出旧桥接类的符号），这里首次调用 start 会抛
+            // UnsatisfiedLinkError；必须与 load 一起兜住，否则异常会在异步线程里被静默吞掉。
+            if (start(new String[0]) != 0) {
+                Chuying.LOGGER.error("原生引擎启动失败: {}", libPath);
+                return false;
+            }
+        } catch (Throwable e) {
+            Chuying.LOGGER.error("原生引擎库加载失败（库缺失/版本不匹配）: {}", libPath, e);
             return false;
         }
         send("uci");

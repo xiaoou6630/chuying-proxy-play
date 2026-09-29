@@ -32,19 +32,20 @@ public final class NativeGomokuEngine implements AutoCloseable {
         if (started) {
             return true;
         }
-        try {
-            bridge.load(libPath);
-        } catch (UnsatisfiedLinkError e) {
-            Chuying.LOGGER.error("原生五子棋引擎库加载失败: {}", libPath, e);
-            return false;
-        }
         // argv = [--config, 配置绝对路径]；argv[0] 由桥接层补（"chuying-engine"）。
         // 注意不能自己塞程序名占位：Rapfi 的 CLI 是 `rapfi [mode] [options]`，
         // 第一个位置参数会被当成运行模式（gomocup/bench/…），多塞一个就变成
         // "unknown mode xxx" 直接退出。
         String[] args = {"--config", configPath};
-        if (bridge.start(args) != 0) {
-            Chuying.LOGGER.error("原生五子棋引擎启动失败: {}", libPath);
+        try {
+            bridge.load(libPath);
+            // JNI 符号惰性绑定：旧版 DLL 上首次调用 start 会抛 UnsatisfiedLinkError，必须兜住
+            if (bridge.start(args) != 0) {
+                Chuying.LOGGER.error("原生五子棋引擎启动失败: {}", libPath);
+                return false;
+            }
+        } catch (Throwable e) {
+            Chuying.LOGGER.error("原生五子棋引擎库加载失败（库缺失/版本不匹配）: {}", libPath, e);
             return false;
         }
         send("START " + SIZE);
