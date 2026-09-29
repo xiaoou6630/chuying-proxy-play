@@ -42,9 +42,9 @@
 
 | 文件 | 适用系统 |
 |---|---|
-| `Chuying Proxy Play<版本>-Fabric-1.20.1-windows.jar` | Windows |
-| `Chuying Proxy Play<版本>-Fabric-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
-| `Chuying Proxy Play<版本>-Fabric-1.20.1-macos.jar` | macOS（Apple Silicon） |
+| `Chuying.Proxy.Play<版本>-Fabric-1.20.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<版本>-Fabric-1.20.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying.Proxy.Play<版本>-Fabric-1.20.1-macos.jar` | macOS（Apple Silicon） |
 
 > 引擎首次运行时自动解压到 `config/chuying/engines/`，无需手动配置。
 
@@ -92,7 +92,7 @@
 ./gradlew build
 ```
 
-产物在 `build/libs/`：`chuying-<版本>.jar`（骨架）+ `Chuying Proxy Play<版本>-Fabric-1.20.1-{windows,linux,macos}.jar`。
+产物在 `build/libs/`：`chuying-<版本>.jar`（骨架）+ `Chuying.Proxy.Play<版本>-Fabric-1.20.1-{windows,linux,macos}.jar`。
 
 ## 许可证
 

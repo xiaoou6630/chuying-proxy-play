@@ -7,7 +7,6 @@
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-orange)
 ![Fabric](https://img.shields.io/badge/Fabric-0.15.11%2B-green)
-[![CurseForge](https://img.shields.io/badge/CurseForge-Download-red)](https://www.curseforge.com/minecraft/mc-mods/chuying-proxy-play)
 ![Engines](https://img.shields.io/badge/Engines-Pikafish%20%7C%20Stockfish%20%7C%20Rapfi-brightgreen)
 
 An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) on **Fabric 1.20.1** that detects when it's your turn in the maid's board games and automatically makes a move with a bundled chess engine.
@@ -43,9 +42,9 @@ One build produces three jars — pick the one for your OS (don't mix them up):
 
 | File | OS |
 |---|---|
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-windows.jar` | Windows |
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-linux.jar` | Linux (x86-64, AVX2) |
-| `Chuying Proxy Play<ver>-Fabric-1.20.1-macos.jar` | macOS (Apple Silicon) |
+| `Chuying.Proxy.Play<ver>-Fabric-1.20.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<ver>-Fabric-1.20.1-linux.jar` | Linux (x86-64, AVX2) |
+| `Chuying.Proxy.Play<ver>-Fabric-1.20.1-macos.jar` | macOS (Apple Silicon) |
 
 > Engines are extracted automatically to `config/chuying/engines/` on first run.
 
@@ -94,7 +93,7 @@ Engine binaries are not committed to git; the GitHub Actions `native-build` work
 ./gradlew build
 ```
 
-Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `Chuying Proxy Play<version>-Fabric-1.20.1-{windows,linux,macos}.jar`.
+Outputs in `build/libs/`: `chuying-<version>.jar` (skeleton) + `Chuying.Proxy.Play<version>-Fabric-1.20.1-{windows,linux,macos}.jar`.
 
 ## License
 
