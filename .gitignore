@@ -58,3 +58,5 @@ native/dist/
 native/gen_targets.cmake
 native/java-test/out/
 native/java-test/pikafish.nnue
+
+native_artifacts/
