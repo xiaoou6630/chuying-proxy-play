@@ -1,0 +1,111 @@
+plugins {
+    id 'fabric-loom' version '1.7.4'
+    id 'java'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+// 国内网络：piston-meta.mojang.com 被墙，Loom 刷新 version manifest 会失败。
+// 指向 BMCLAPI 镜像拿 1.20.1 版本元数据（client.jar/libraries 走本地缓存 + libraries.minecraft.net，均可达）。
+loom {
+    customMinecraftMetadata = "https://bmclapi2.bangbang93.com/version/1.20.1/json"
+}
+
+repositories {
+    maven { url "https://maven.fabricmc.net/" }
+    maven { url "https://maven.shedaniel.me/" }
+    maven { url "https://maven.terraformersmc.com/releases/" }
+    // 国内镜像兜底
+    maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
+    maven { url "https://bmclapi2.bangbang93.com/maven" }
+    // 本地 libs（TLM Fabric / ForgeConfigAPIPort）
+    flatDir { dirs 'libs' }
+}
+
+dependencies {
+    // Minecraft 本体 + mojmap 官方映射（与 Orihime/TLM 的 mojmap 源码名一致）
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+
+    // Fabric 加载器 + Fabric API
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    // 前置 mod：Touhou Little Maid (Orihime Fabric) —— 本地 libs，不打包（唯一 mod 前置）
+    modImplementation(files("libs/touhoulittlemaid-fabric-0.8.2-forge1.5.3+mc1.20.1.jar"))
+
+    // ModMenu：内嵌进 jar（jar-in-jar 嵌套 mod，提供配置入口），玩家免装
+    modImplementation("com.terraformersmc:modmenu:${modmenu_version}")
+    include("com.terraformersmc:modmenu:${modmenu_version}")
+
+    // Cloth Config（配置界面）：内嵌进 jar（含其运行时传递依赖 jankson/toml4j/snakeyaml），玩家免装
+    modImplementation("me.shedaniel.cloth:cloth-config-fabric:${cloth_version}") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+    include("me.shedaniel.cloth:cloth-config-fabric:${cloth_version}") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+    include("blue.endless:jankson:1.2.0")
+    include("com.moandjiezana.toml:toml4j:0.7.2")
+    include("org.yaml:snakeyaml:1.27")
+
+    // ModMenu（配置入口按钮），玩家前置安装
+    modImplementation("com.terraformersmc:modmenu:${modmenu_version}")
+}
+
+// processResources 保持 Gradle 默认（纯字节复制），不做任何过滤/expand/charset 设置——
+// Windows 下 Gradle 读源文件用平台默认 GBK，若再设 filteringCharset 反而双重编码把 fabric.mod.json 的中文弄乱。
+// fabric.mod.json 里版本号已直接写死（与 gradle.properties 的 mod_version 保持一致）。
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// ---- 三平台分发包：一次 build 产出 windows/linux/macos 三个 jar，各自只带本平台引擎 ----
+def enginePlatforms = ['windows', 'linux', 'macos']
+
+// 主 jar 不打包引擎，引擎由各平台 jar 携带，避免重复与体积膨胀
+tasks.named('jar', Jar).configure {
+    exclude 'engines/**'
+}
+
+enginePlatforms.each { plat ->
+    tasks.register("jar${plat.capitalize()}", Jar) {
+        group = 'build'
+        // 产物命名：Chuying.Proxy.Play<版本>-Fabric-<MC版本>-<系统>.jar
+        // （带加载器与 MC 版本，方便和 Forge/NeoForge 版本区分）
+        archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}-${plat}.jar"
+
+        dependsOn tasks.named('remapJar')
+
+        // 复用 remapJar 的全部内容（class、资源、fabric.mod.json、mixins、内嵌 cloth-config 等）
+        // 引擎不随 remapJar（含三平台全部），改为下方按平台单独打入
+        from(zipTree(tasks.named('remapJar').flatMap { it.archiveFile })) {
+            exclude 'META-INF/MANIFEST.MF'
+            exclude 'engines/**'
+        }
+
+        // 打入本平台引擎 + 三平台共享资源（目录缺失时自动跳过）
+        // 2.0 起引擎为 JNI 原生库（.dll/.so/.dylib），jar 内直接带平台后缀，
+        // 权重等数据文件放 engines/shared/（只打包一份）。
+        def platDir = file("src/main/resources/engines/${plat}")
+        def sharedDir = file('src/main/resources/engines/shared')
+        if (platDir.exists()) {
+            from(platDir) { into "engines/${plat}" }
+        }
+        if (sharedDir.exists()) {
+            from(sharedDir) { into 'engines/shared' }
+        }
+    }
+}
+
+tasks.named('assemble').configure {
+    dependsOn enginePlatforms.collect { "jar${it.capitalize()}" }
+}

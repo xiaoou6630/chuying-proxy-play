@@ -1,0 +1,47 @@
+THIRD PARTY LICENSES
+====================
+
+Chuying Proxy Play（褚嬴代打）内置三个开源棋类引擎。自 2.0 起，三个引擎不再以独立
+可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、在游戏进程内运行**
+（stdin/stdout 被重定向到内存队列，不 spawn 任何 OS 进程）。
+
+1) Pikafish（中国象棋引擎）
+   Source:  https://github.com/official-pikafish/Pikafish
+   License: GNU General Public License v3.0
+   说明:    随 jar 分发的 chuying_pikafish 原生库由 Pikafish 源码 + 本 mod 的
+            JNI 桥接层（native/src，同样 GPL-3.0-only）链接而成，构建期补丁见
+            .github/scripts/build_native.sh（重命名 main()、屏蔽 Windows 下用进程
+            命令行覆盖 argv 的行为）。
+   权重:    随附的神经网络权重 pikafish.nnue 遵循 Pikafish 的 NNUE 许可 ——
+            仅限个人、非商业用途；任何商业使用需向 Pikafish 团队另行获取商业授权。
+            NNUE 许可全文见同目录 pikafish_NNUE_LICENSE.txt
+
+2) Stockfish（国际象棋引擎）
+   Source:  https://github.com/official-stockfish/Stockfish
+   License: GNU General Public License v3.0
+   说明:    随 jar 分发的 chuying_stockfish 原生库链接 Stockfish 源码；两份 NNUE
+            权重（nn-1c0000000000 / nn-37f18f62d772）在构建期以 INCBIN 编入该库，
+            因此不需要额外权重文件。
+
+3) Rapfi（五子棋/连珠引擎）
+   Source:  https://github.com/dhbloo/rapfi
+   License: GNU General Public License v3.0
+   说明:    随 jar 分发的 chuying_rapfi 原生库链接 Rapfi 源码，构建期关闭其
+            MULTI_THREADING（避免在 Windows 加载期初始化全局对象时创建线程而死锁）。
+   模型:    随附的 model210901.bin / mix9svqfreestyle_bsmix.bin.lz4 来自 Rapfi
+            官方发布，遵循其仓库同样许可。
+
+------------------------------------------------------------------------------
+GPL 合规说明（对应源码获取方式）
+
+上述三个引擎均为 GNU GPL-3.0，本 mod 本体同样以 GPL-3.0-only 发布
+（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
+
+GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
+  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库按固定 commit 拉取；
+  - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录三个引擎的仓库地址与
+    精确 commit hash（下载页的 Release 说明中同样列出）；
+  - 构建脚本 .github/scripts/build_native.sh 完整公开了源码所打的全部补丁，
+    据此可复现出与本 mod 完全一致的引擎二进制。
+
+GNU GPL v3 完整文本：https://www.gnu.org/licenses/gpl-3.0.txt
