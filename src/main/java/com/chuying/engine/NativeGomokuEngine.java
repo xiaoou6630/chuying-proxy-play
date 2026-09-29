@@ -18,7 +18,7 @@ public final class NativeGomokuEngine implements AutoCloseable {
     /** 单次读取等待上限；读空只表示「暂时没输出」（冷加载模型、长考都会出现空档） */
     private static final int READ_SLICE_MS = 200;
 
-    private final NativeEngineBridge bridge = new NativeEngineBridge();
+    private final GomokuNativeBridge bridge = new GomokuNativeBridge();
     private final String libPath;
     private final String configPath;
     private volatile boolean started = false;

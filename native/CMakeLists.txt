@@ -80,12 +80,20 @@ set(NO_MULTI_THREADING ON CACHE BOOL "chuying: no threads during static init" FO
 add_subdirectory(engines/rapfi/Rapfi rf_build)
 
 function(chuying_bridge name)
-    cmake_parse_arguments(ARG "" "" "SOURCES;INCLUDES;LIBS" ${ARGN})
+    cmake_parse_arguments(ARG "" "JNI_DEFINE" "SOURCES;INCLUDES;LIBS" ${ARGN})
     add_library(${name} SHARED
         ${CMAKE_CURRENT_LIST_DIR}/src/uci_bridge.cpp
         ${CMAKE_CURRENT_LIST_DIR}/src/jni_exports.cpp
         ${ARG_SOURCES})
     target_include_directories(${name} PRIVATE ${ARG_INCLUDES})
+    # One exported JNI class per engine. The three libraries must NOT export the
+    # same JNI symbols: the JVM binds a native method name to the FIRST loaded
+    # library that exports it, so shared names make the 2nd/3rd engine's start()
+    # land on the 1st engine's singleton and fail at once.
+    # Each lib compiles jni_exports.cpp with exactly one CHUYING_ENGINE_* define
+    # and only exports its own five symbols (the #error in jni_exports.cpp guards
+    # a missing define at build time, not at runtime).
+    target_compile_definitions(${name} PRIVATE ${ARG_JNI_DEFINE})
     if(ARG_LIBS)
         target_link_libraries(${name} PRIVATE ${ARG_LIBS})
     endif()
@@ -96,10 +104,12 @@ function(chuying_bridge name)
 endfunction()
 
 chuying_bridge(chuying_stockfish
+    JNI_DEFINE CHUYING_ENGINE_WCHESS
     SOURCES ${SF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/stockfish/src)
 
 chuying_bridge(chuying_pikafish
+    JNI_DEFINE CHUYING_ENGINE_CCHESS
     SOURCES ${PF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/pikafish/src)
 # Pikafish bundles zstd whose ASM fast-loop is an .S file not in our glob; disable it.
@@ -111,4 +121,6 @@ target_compile_definitions(chuying_pikafish PRIVATE ZSTD_DISABLE_ASM)
 target_compile_definitions(chuying_pikafish PRIVATE
     DEFAULT_NNUE_DIRECTORY="config/chuying/engines/${CHUYING_PLATFORM}")
 
-chuying_bridge(chuying_rapfi LIBS rapfi)
+chuying_bridge(chuying_rapfi
+    JNI_DEFINE CHUYING_ENGINE_GOMOKU
+    LIBS rapfi)

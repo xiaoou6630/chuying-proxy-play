@@ -35,7 +35,7 @@ public final class EngineManager {
             if (nnue != null) {
                 options.put("EvalFile", nnue);
             }
-            cchess = new NativeUciEngine(lib, options);
+            cchess = new NativeUciEngine(lib, options, false);
         }
         return cchess;
     }
@@ -53,7 +53,7 @@ public final class EngineManager {
             if (lib == null) {
                 return null;
             }
-            wchess = new NativeUciEngine(lib, Map.of());
+            wchess = new NativeUciEngine(lib, Map.of(), true);
         }
         // 避和强度（仅国象 Stockfish 支持）：让引擎主动求胜、避免强制和棋，配置实时生效
         wchess.setAggressiveness(Config.AVOID_DRAW.get().aggressiveness);

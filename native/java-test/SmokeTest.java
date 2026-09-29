@@ -1,19 +1,78 @@
-import com.chuying.engine.NativeEngineBridge;
+import com.chuying.engine.CChessNativeBridge;
+import com.chuying.engine.GomokuNativeBridge;
+import com.chuying.engine.WChessNativeBridge;
 
 /**
  * CI smoke test: loads the native engine library in-process (no OS process
  * spawned) and runs a minimal protocol handshake.
+ *
+ * Each engine has its own JNI bridge class (CChess/WChess/GomokuNativeBridge):
+ * the three libraries must NOT share JNI symbol names, otherwise the JVM binds
+ * them all to the first-loaded library and the 2nd/3rd engine fails at start.
+ * This test uses the same per-engine class as the mod, so it covers the real
+ * binding.
  *
  * Usage: java SmokeTest <stockfish|pikafish|rapfi> <path-to-library>
  * Exit 0 = PASS, 1 = FAIL.
  */
 public class SmokeTest {
 
+    /** Minimal bridge surface shared by the three native bridge classes. */
+    interface Bridge {
+        void load(String libraryPath);
+        int start(String[] args);
+        int send(String cmd);
+        String read(int timeoutMs);
+        void stop();
+        boolean isAlive();
+    }
+
+    static final class CChessBridge implements Bridge {
+        private final CChessNativeBridge b = new CChessNativeBridge();
+        public void load(String p) { b.load(p); }
+        public int start(String[] a) { return b.start(a); }
+        public int send(String c) { return b.send(c); }
+        public String read(int t) { return b.read(t); }
+        public void stop() { b.stop(); }
+        public boolean isAlive() { return b.isAlive(); }
+    }
+
+    static final class WChessBridge implements Bridge {
+        private final WChessNativeBridge b = new WChessNativeBridge();
+        public void load(String p) { b.load(p); }
+        public int start(String[] a) { return b.start(a); }
+        public int send(String c) { return b.send(c); }
+        public String read(int t) { return b.read(t); }
+        public void stop() { b.stop(); }
+        public boolean isAlive() { return b.isAlive(); }
+    }
+
+    static final class GomokuBridge implements Bridge {
+        private final GomokuNativeBridge b = new GomokuNativeBridge();
+        public void load(String p) { b.load(p); }
+        public int start(String[] a) { return b.start(a); }
+        public int send(String c) { return b.send(c); }
+        public String read(int t) { return b.read(t); }
+        public void stop() { b.stop(); }
+        public boolean isAlive() { return b.isAlive(); }
+    }
+
     public static void main(String[] args) throws Exception {
         String engine = args[0];
         String libPath = args[1];
 
-        NativeEngineBridge bridge = new NativeEngineBridge();
+        Bridge bridge;
+        if ("stockfish".equals(engine)) {
+            bridge = new WChessBridge();
+        } else if ("pikafish".equals(engine)) {
+            bridge = new CChessBridge();
+        } else if ("rapfi".equals(engine)) {
+            bridge = new GomokuBridge();
+        } else {
+            System.out.println("[smoke] unknown engine: " + engine);
+            System.exit(1);
+            return;
+        }
         bridge.load(libPath);
         System.out.println("[smoke] library loaded: " + libPath);
 
@@ -64,7 +123,7 @@ public class SmokeTest {
         System.exit(ok ? 0 : 1);
     }
 
-    static boolean expect(NativeEngineBridge bridge, String want, int timeoutMs)
+    static boolean expect(Bridge bridge, String want, int timeoutMs)
             throws InterruptedException {
         long t0 = System.currentTimeMillis();
         while (System.currentTimeMillis() - t0 < timeoutMs) {
@@ -78,7 +137,7 @@ public class SmokeTest {
     }
 
     /** Wait for any line starting with the given prefix (e.g. "bestmove"). */
-    static boolean expectPrefix(NativeEngineBridge bridge, String prefix, int timeoutMs)
+    static boolean expectPrefix(Bridge bridge, String prefix, int timeoutMs)
             throws InterruptedException {
         long t0 = System.currentTimeMillis();
         while (System.currentTimeMillis() - t0 < timeoutMs) {

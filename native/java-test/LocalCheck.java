@@ -1,4 +1,4 @@
-import com.chuying.engine.NativeEngineBridge;
+import com.chuying.engine.WChessNativeBridge;
 
 /** Local Windows check: load DLL, optionally point EvalFile at a net, verify evaluation. */
 public class LocalCheck {
@@ -7,7 +7,7 @@ public class LocalCheck {
         String net = args.length > 1 && !args[1].equals("-") ? args[1] : null;
         int depth = args.length > 2 ? Integer.parseInt(args[2]) : 6;
 
-        NativeEngineBridge e = new NativeEngineBridge();
+        WChessNativeBridge e = new WChessNativeBridge();
         e.load(lib);
         log("loaded " + lib);
         log("start rc=" + e.start(new String[0]));

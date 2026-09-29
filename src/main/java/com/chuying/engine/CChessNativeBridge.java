@@ -1,17 +1,19 @@
 package com.chuying.engine;
 
 /**
- * 原生引擎库的 JNI 桥接（进程内运行，零子进程）。
+ * 中国象棋引擎（皮卡鱼）的 JNI 桥接（进程内运行，零子进程）。
  * <p>
- * 每个棋种一个独立原生库（chuying_stockfish / chuying_pikafish / chuying_rapfi），
- * 库内线程跑引擎主循环，stdin/stdout 被重定向到内存队列，Java 侧通过
- * {@link #send(String)} / {@link #read(int)} 收发行。
+ * <b>每个引擎必须用自己独立的桥接类</b>：三个原生库（chuying_stockfish /
+ * chuying_pikafish / chuying_rapfi）若导出同名 JNI 函数，JVM 只会把它们绑定到
+ * 先加载的那个库上。游戏里三个引擎常驻同一 JVM，若共用一个桥接类，后加载引擎的
+ * start 会打到先加载引擎的单例上直接被拒（"原生引擎启动失败"，bestmove 恒为 null）。
+ * 各自独立类名 → 各自独立 native 符号 → 各自独立 EngineBridge 单例，无串扰。
  * <p>
  * 库路径必须是解压后的绝对路径（{@link EngineExtractor} 提供），
  * 不用 System.loadLibrary，避免依赖 java.library.path。
  * 加载失败抛 {@link UnsatisfiedLinkError}，由上层捕获降级。
  */
-public final class NativeEngineBridge {
+public final class CChessNativeBridge {
 
     private boolean loaded = false;
 
@@ -24,7 +26,7 @@ public final class NativeEngineBridge {
         loaded = true;
     }
 
-    /** 启动引擎线程，返回 0 成功；args 传给引擎 main 的 argv[1..]（如 rapfi 的 --config） */
+    /** 启动引擎线程，返回 0 成功；args 传给引擎 main 的 argv[1..] */
     public native int start(String[] args);
 
     /** 向引擎发送一行命令，返回 0 成功（引擎已退出返回 1） */

@@ -18,7 +18,9 @@ public final class NativeUciEngine implements AutoCloseable {
     /** 单次读取等待上限；读空只表示「暂时没输出」，不代表引擎出问题 */
     private static final int READ_SLICE_MS = 200;
 
-    private final NativeEngineBridge bridge = new NativeEngineBridge();
+    private final CChessNativeBridge cBridge;
+    private final WChessNativeBridge wBridge;
+    private final boolean isWChess;
     private final String libPath;
     /** 启动时下发的 setoption（如 EvalFile → NNUE 绝对路径），保持插入顺序 */
     private final Map<String, String> initOptions;
@@ -28,8 +30,44 @@ public final class NativeUciEngine implements AutoCloseable {
     private int appliedAggressiveness = -1;
 
     public NativeUciEngine(String libPath, Map<String, String> initOptions) {
+        this(libPath, initOptions, false);
+    }
+
+    /** @param wchess true = 国际象棋（Stockfish），会绑定 WChessNativeBridge 的 JNI 符号 */
+    public NativeUciEngine(String libPath, Map<String, String> initOptions, boolean wchess) {
         this.libPath = libPath;
         this.initOptions = initOptions == null ? Map.of() : new LinkedHashMap<>(initOptions);
+        this.isWChess = wchess;
+        this.cBridge = wchess ? null : new CChessNativeBridge();
+        this.wBridge = wchess ? new WChessNativeBridge() : null;
+    }
+
+    private int start(String[] args) {
+        return isWChess ? wBridge.start(args) : cBridge.start(args);
+    }
+
+    private void load() {
+        if (isWChess) {
+            wBridge.load(libPath);
+        } else {
+            cBridge.load(libPath);
+        }
+    }
+
+    private int sendRaw(String cmd) {
+        return isWChess ? wBridge.send(cmd) : cBridge.send(cmd);
+    }
+
+    private String readRaw(int timeoutMs) {
+        return isWChess ? wBridge.read(timeoutMs) : cBridge.read(timeoutMs);
+    }
+
+    private void stopRaw() {
+        if (isWChess) {
+            wBridge.stop();
+        } else {
+            cBridge.stop();
+        }
     }
 
     private synchronized boolean ensureStarted() {
@@ -37,12 +75,12 @@ public final class NativeUciEngine implements AutoCloseable {
             return true;
         }
         try {
-            bridge.load(libPath);
+            load();
         } catch (UnsatisfiedLinkError e) {
             Chuying.LOGGER.error("原生引擎库加载失败: {}", libPath, e);
             return false;
         }
-        if (bridge.start(new String[0]) != 0) {
+        if (start(new String[0]) != 0) {
             Chuying.LOGGER.error("原生引擎启动失败: {}", libPath);
             return false;
         }
@@ -89,7 +127,7 @@ public final class NativeUciEngine implements AutoCloseable {
      */
     private String awaitBestMove(long deadline) {
         while (System.currentTimeMillis() < deadline) {
-            String line = bridge.read(READ_SLICE_MS);
+            String line = readRaw(READ_SLICE_MS);
             if (line == null) {
                 continue;
             }
@@ -119,7 +157,7 @@ public final class NativeUciEngine implements AutoCloseable {
     private boolean waitFor(String marker, int timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            String line = bridge.read(READ_SLICE_MS);
+            String line = readRaw(READ_SLICE_MS);
             if (line == null) {
                 continue;
             }
@@ -139,7 +177,7 @@ public final class NativeUciEngine implements AutoCloseable {
     }
 
     private void send(String cmd) {
-        if (bridge.send(cmd) != 0) {
+        if (sendRaw(cmd) != 0) {
             Chuying.LOGGER.warn("[chuying] 原生引擎已退出，命令未送达: {}", cmd);
         }
     }
@@ -148,7 +186,7 @@ public final class NativeUciEngine implements AutoCloseable {
     public synchronized void close() {
         if (started) {
             send("quit");
-            bridge.stop();
+            stopRaw();
             started = false;
         }
     }
