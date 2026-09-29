@@ -1,0 +1,269 @@
+buildscript {
+    repositories {
+        maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
+        maven { url "https://bmclapi2.bangbang93.com/maven" }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+}
+
+apply plugin: 'org.spongepowered.mixin'
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+minecraft {
+    // The mappings can be changed at any time and must be in the following format.
+    // Channel:   Version:
+    // official   MCVersion             Official field/method names from Mojang mapping files
+    // parchment  YYYY.MM.DD-MCVersion  Open community-sourced parameter names and javadocs layered on top of official
+    //
+    // You must be aware of the Mojang license when using the 'official' or 'parchment' mappings.
+    // See more information here: https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
+    //
+    // Parchment is an unofficial project maintained by ParchmentMC, separate from MinecraftForge
+    // Additional setup is needed to use their mappings: https://parchmentmc.org/docs/getting-started
+    //
+    // Use non-default mappings at your own risk. They may not always work.
+    // Simply re-run your setup task after changing the mappings to update your workspace.
+    mappings channel: mapping_channel, version: mapping_version
+
+    // When true, this property will have all Eclipse/IntelliJ IDEA run configurations run the "prepareX" task for the given run configuration before launching the game.
+    // In most cases, it is not necessary to enable.
+    // enableEclipsePrepareRuns = true
+    // enableIdeaPrepareRuns = true
+
+    // This property allows configuring Gradle's ProcessResources task(s) to run on IDE output locations before launching the game.
+    // It is REQUIRED to be set to true for this template to function.
+    // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+    copyIdeResources = true
+
+    // When true, this property will add the folder name of all declared run configurations to generated IDE run configurations.
+    // The folder name can be set on a run configuration using the "folderName" property.
+    // By default, the folder name of a run configuration is the name of the Gradle project containing it.
+    // generateRunFolders = true
+
+    // This property enables access transformers for use in development.
+    // They will be applied to the Minecraft artifact.
+    // The access transformer file can be anywhere in the project.
+    // However, it must be at "META-INF/accesstransformer.cfg" in the final mod jar to be loaded by Forge.
+    // This default location is a best practice to automatically put the file in the right place in the final jar.
+    // See https://docs.minecraftforge.net/en/latest/advanced/accesstransformers/ for more information.
+    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    // Default run configurations.
+    // These can be tweaked, removed, or duplicated as needed.
+    runs {
+        // applies to all the run configs below
+        configureEach {
+            workingDirectory project.file('run')
+
+            // Recommended logging data for a userdev environment
+            // The markers can be added/remove as needed separated by commas.
+            // "SCAN": For mods scan.
+            // "REGISTRIES": For firing of registry events.
+            // "REGISTRYDUMP": For getting the contents of all registries.
+            property 'forge.logging.markers', 'REGISTRIES'
+
+            // Recommended logging level for the console
+            // You can set various levels here.
+            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
+            property 'forge.logging.console.level', 'debug'
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        // This run config launches GameTestServer and runs all registered gametests, then exits.
+        // By default, the server will crash when no gametests are provided.
+        // The gametest system is also enabled by default for other run configs under the /test command.
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            // example of overriding the workingDirectory set in configureEach above
+            workingDirectory project.file('run-data')
+
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+// Include resources generated by data generators.
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+    config "${mod_id}.mixins.json"
+}
+
+repositories {
+    // 国内镜像加速 + libs 本地依赖（TLM）
+    maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" }
+    maven { url "https://bmclapi2.bangbang93.com/maven" }
+    // Cloth Config 官方 maven（JarJar 内嵌配置界面库）
+    maven { url "https://maven.shedaniel.me/" }
+    // ForgeGradle 内置 repo（client 的 pom/库在此，作为 maven repo 显式加入才能解析 client 依赖）
+    maven { url = uri("${gradle.gradleUserHomeDir}/caches/forge_gradle/bundeled_repo") }
+    maven { url = uri("${gradle.gradleUserHomeDir}/caches/forge_gradle/mcp_repo") }
+    // Mojang 的第三方库（libraries.minecraft.net）
+    maven { url "https://libraries.minecraft.net" }
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+dependencies {
+    // Specify the version of Minecraft to use.
+    // Any artifact can be supplied so long as it has a "userdev" classifier artifact and is a compatible patcher artifact.
+    // The "userdev" classifier will be requested and setup by ForgeGradle.
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // 前置 mod Touhou Little Maid（Forge 1.20.1）：本地 libs 引入，不打包进 jar
+    implementation fg.deobf(fileTree(dir: 'libs', include: 'touhoulittlemaid*.jar'))
+
+    // Cloth Config：编译依赖 + JarJar 内嵌（Forge 自动去重版本，玩家无需单独安装）
+    // ranged 声明宽松版本范围，与外部已装的 cloth-config 共存不冲突
+    implementation 'me.shedaniel.cloth:cloth-config-forge:11.1.106'
+    jarJar('me.shedaniel.cloth:cloth-config-forge:11.1.106') {
+        jarJar.ranged(it, '[11.1.106,)')
+    }
+
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+// This block of code expands all declared replace properties in the specified resource targets.
+// A missing property will result in an error. Properties are expanded using ${} Groovy notation.
+// When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
+// See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
+tasks.named('processResources', ProcessResources).configure {
+    // Windows 上 Gradle expand 写文件默认用系统编码（GBK），导致 mods.toml 中文乱码，强制 UTF-8 输出
+    filteringCharset = 'UTF-8'
+
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+// Example for how to get properties into the manifest for reading at runtime.
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1', // We are version 1 of ourselves
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+
+    // 主 jar 不打包引擎，引擎由各平台 jar 携带
+    exclude 'engines/**'
+
+    // This is the preferred method to reobfuscate your jar file
+    finalizedBy 'reobfJar'
+}
+
+// ---- 三平台分发包：一次 build 产出 windows/linux/macos 三个 jar，各自只带本平台引擎 ----
+def enginePlatforms = ['windows', 'linux', 'macos']
+
+enginePlatforms.each { plat ->
+    tasks.register("jar${plat.capitalize()}", Jar) {
+        group = 'build'
+        // 产物命名：Chuying.Proxy.Play<版本>-Forge-<MC版本>-<系统>.jar
+        // （带加载器与 MC 版本，方便和其它版本区分）
+        archiveFileName = "Chuying.Proxy.Play${mod_version}-Forge-${minecraft_version}-${plat}.jar"
+
+        dependsOn tasks.named('reobfJarJar')
+
+        // 复用全量 jar 全部内容（class、资源、mods.toml、JarJar 内嵌的 cloth-config 等）。
+        // jarJar 产出 -all.jar（含内嵌依赖），reobfJarJar 原地把它重映射到 SRG（覆盖同名文件）。
+        from(zipTree(tasks.named('jarJar').flatMap { it.archiveFile })) {
+            exclude 'engines/**'
+            exclude 'META-INF/MANIFEST.MF' // manifest 由 Jar 任务自动生成
+        }
+
+        // 打入本平台引擎 + 三平台共享资源（目录缺失时自动跳过）
+        // 2.0 起引擎为 JNI 原生库（.dll/.so/.dylib，CurseForge 已允许），jar 内直接带平台后缀；
+        // 权重等数据文件放 engines/shared/（只打包一份）。
+        def platDir = file("src/main/resources/engines/${plat}")
+        def sharedDir = file('src/main/resources/engines/shared')
+        if (platDir.exists()) {
+            from(platDir) { into "engines/${plat}" }
+        }
+        if (sharedDir.exists()) {
+            from(sharedDir) { into 'engines/shared' }
+        }
+    }
+}
+
+tasks.named('assemble').configure {
+    dependsOn enginePlatforms.collect { "jar${it.capitalize()}" }
+}
+
+// However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
+// tasks.named('publish').configure {
+//     dependsOn 'reobfJar'
+// }
+
+// Example configuration to allow publishing using the maven-publish plugin
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
