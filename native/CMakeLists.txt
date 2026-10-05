@@ -159,8 +159,13 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
     add_subdirectory(${CHUYING_GNUG0_DIR} gnugo_build)
 
     add_library(chuying_gnugo SHARED ${CMAKE_CURRENT_LIST_DIR}/src/gnugo_bridge.cpp)
+    # gnugo.h 会连带包含 engine/board.h -> sgf/sgftree.h、utils/winsocket.h 等，
+    # 因此四个源码目录都要在包含路径上；再加 CMake 生成 config.h 的目录。
     target_include_directories(chuying_gnugo PRIVATE
         ${CHUYING_GNUG0_DIR}/engine
+        ${CHUYING_GNUG0_DIR}/sgf
+        ${CHUYING_GNUG0_DIR}/utils
+        ${CHUYING_GNUG0_DIR}/patterns
         ${CHUYING_GNUG0_DIR}
         ${CMAKE_CURRENT_BINARY_DIR}/gnugo_build
         "$ENV{JAVA_HOME}/include"
