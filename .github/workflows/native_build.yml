@@ -97,3 +97,14 @@ jobs:
         timeout-minutes: 8
         run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} gnugo
         shell: bash
+
+      # 临时诊断：gnugo 断言 abort 时抓原生调用栈（定位 GNU Go 内部崩点）
+      - name: gdb backtrace (gnugo, linux only)
+        if: always() && matrix.platform == 'linux'
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          cd native/java-test
+          javac -d out ../../src/main/java/com/chuying/engine/GoNativeBridge.java SmokeTest.java
+          gdb -batch -ex run -ex "bt 40" --args java -cp out SmokeTest gnugo "$PWD/../dist/chuying_gnugo.so" 2>&1 | tail -90
+        shell: bash
