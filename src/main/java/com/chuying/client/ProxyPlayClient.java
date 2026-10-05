@@ -193,13 +193,15 @@ public class ProxyPlayClient {
         if (center == null || te == null) {
             return;
         }
-        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 3000;
+        // 注意：这是**代打自己的收工**（引擎想停手且我方领先），不是"举报一手"，
+        // 所以用独立的大字与文案，别闪成"举报一手！"。
+        ProxyPlayState.finishFlashUntil = System.currentTimeMillis() + 3000;
         mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.2F));
         if (GoCompat.judgeMaidPass(te, center)) {
             // 女仆被判停一手（passCount=1、回合回到我方）→ 我方也停一手 → passCount=2 → 数子终局
             PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, true));
             Chuying.LOGGER.info("[chuying] go 收工：我方停一手 + 女仆停一手 -> 数子终局 @ {}", center);
-            reportNotice(mc, "message.chuying.report_win");
+            reportNotice(mc, "message.chuying.finish_win");
         }
     }
 

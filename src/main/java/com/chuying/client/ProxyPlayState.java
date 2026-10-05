@@ -28,6 +28,8 @@ public final class ProxyPlayState {
     public static volatile boolean reportHoldFired = false;
     /** "举报一手" HUD 大字显示到什么时候（毫秒时间戳） */
     public static volatile long reportFlashUntil = 0;
+    /** 代打"收工判胜"（引擎想停手 + 我方领先 → 双停终局）的 HUD 大字时间戳 */
+    public static volatile long finishFlashUntil = 0;
 
     private ProxyPlayState() {
     }

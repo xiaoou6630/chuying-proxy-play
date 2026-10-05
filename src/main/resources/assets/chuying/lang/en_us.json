@@ -25,6 +25,7 @@
   "hud.chuying.proxy_on": "Chuying Proxy Play: ON",
   "hud.chuying.proxy_off": "Chuying Proxy Play: OFF",
   "hud.chuying.report": "REPORTED!",
+  "hud.chuying.finish": "CLOSED OUT - YOU WIN!",
   "hud.chuying.report_hold": "Reporting... %s",
   "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine library missing or extraction failed",
   "message.chuying.no_wchess_engine": "Chuying: Western Chess engine library missing or extraction failed",
@@ -33,6 +34,6 @@
   "message.chuying.no_go_engine": "Chuying: Go engine library missing or extraction failed",
   "message.chuying.need_empty_hand": "Chuying Proxy Play: empty your main hand (the board requires an empty hand)",
   "message.chuying.report_need_board": "Chuying: aim at a Go board to report a move",
-  "message.chuying.report_win": "Chuying: game closed by double pass - you win on score!",
+  "message.chuying.finish_win": "Chuying: closed out by double pass - you win on score!",
   "message.chuying.instant_win": "Chuying: report upheld - you win!"
 }

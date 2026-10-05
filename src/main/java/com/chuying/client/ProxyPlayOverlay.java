@@ -32,6 +32,14 @@ public class ProxyPlayOverlay implements LayeredDraw.Layer {
             guiGraphics.drawCenteredString(font, countdown, cx, y - 12, 0xFFFFAA);
         }
 
+        // 代打自己收工判胜（不是举报）：单独一行金黄色大字
+        if (System.currentTimeMillis() < ProxyPlayState.finishFlashUntil) {
+            Component finish = Component.translatable("hud.chuying.finish");
+            int y = cy - 82;
+            guiGraphics.drawCenteredString(font, finish, cx + 1, y + 1, 0x554400);
+            guiGraphics.drawCenteredString(font, finish, cx, y, 0xFFCC00);
+        }
+
         // 举报一手（= 判我方获胜）：无论代打开关都显示（整活优先）
         if (System.currentTimeMillis() < ProxyPlayState.reportFlashUntil) {
             Component report = Component.translatable("hud.chuying.report");
