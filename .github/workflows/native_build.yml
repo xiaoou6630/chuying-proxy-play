@@ -113,3 +113,20 @@ jobs:
             SmokeTest.java
           gdb -batch -ex run -ex "bt 40" --args java -cp out SmokeTest gnugo "$PWD/../dist/chuying_gnugo.so" 2>&1 | tail -100
         shell: bash
+
+      # 临时诊断：只崩在 macOS，用未 strip 的库 + lldb 抓调用栈
+      - name: lldb backtrace (gnugo, macos only)
+        if: always() && matrix.platform == 'macos'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          cd native/java-test
+          javac -d out \
+            ../../src/main/java/com/chuying/engine/CChessNativeBridge.java \
+            ../../src/main/java/com/chuying/engine/WChessNativeBridge.java \
+            ../../src/main/java/com/chuying/engine/GomokuNativeBridge.java \
+            ../../src/main/java/com/chuying/engine/GoNativeBridge.java \
+            SmokeTest.java
+          ls -la ../build/chuying_gnugo.dylib || true
+          lldb -b -o run -o "bt 45" -o quit -- java -cp out SmokeTest gnugo "$PWD/../build/chuying_gnugo.dylib" 2>&1 | tail -130
+        shell: bash
