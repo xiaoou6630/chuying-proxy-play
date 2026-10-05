@@ -38,6 +38,9 @@ extern int verbose;          // engine/globals.c
 extern int debug;            // engine/globals.c
 extern int showtime;         // engine/globals.c
 extern int showscore;        // engine/globals.c
+extern int capture_all_dead;   // engine/globals.c：追吃对方死子
+extern int play_out_aftermath; // engine/globals.c：把局面彻底走净（不许闲着）
+extern int movenum;            // board.h：手数（GNU Go 内部判断棋局阶段）
 }
 
 namespace {
@@ -84,6 +87,13 @@ Java_com_chuying_engine_GoNativeBridge_nativeInit(JNIEnv*, jobject, jint cacheMb
     // 规则对齐模组 GoRules：数子(area counting)、不允许认输（代打只落子/停手）
     chinese_rules = 1;
     resign_allowed = 0;
+
+    // 关键：对手（女仆）永远不会主动停手，而 GNU Go 一旦"自认为大局已定"就会一直
+    // 停手送分 —— 实测一局 237 手里有 82 手是 pass，直接把棋送输。
+    //   play_out_aftermath：把局面彻底走净（该填的填、该收的收），不许闲着；
+    //   capture_all_dead：继续追吃对方的死子。
+    play_out_aftermath = 1;
+    capture_all_dead = 1;
 
     if (level <= 0) {
         level = 10;
@@ -165,6 +175,8 @@ Java_com_chuying_engine_GoNativeBridge_nativeSetPosition(JNIEnv* env, jobject, j
     } else {
         board_ko_pos = NO_MOVE;
     }
+    // 让 GNU Go 知道棋局走到哪一步了（每次都是 clear_board + 摆子，手数会被清零）
+    movenum = placed;
     return placed;
 }
 

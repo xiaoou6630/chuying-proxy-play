@@ -65,15 +65,22 @@ public class ProxyPlayClient {
         int delayTicks;
         /** PVP 代打：本轮点击需服务端处于潜行态才生效 */
         final boolean sneak;
+        /** 围棋棋盘中心（非空表示这是代打发出的围棋落子；发完后若举报已挂起，立即抢判） */
+        final BlockPos goCenter;
 
         PendingClick(BlockHitResult hit, int delayTicks) {
-            this(hit, delayTicks, false);
+            this(hit, delayTicks, false, null);
         }
 
         PendingClick(BlockHitResult hit, int delayTicks, boolean sneak) {
+            this(hit, delayTicks, sneak, null);
+        }
+
+        PendingClick(BlockHitResult hit, int delayTicks, boolean sneak, BlockPos goCenter) {
             this.hit = hit;
             this.delayTicks = delayTicks;
             this.sneak = sneak;
+            this.goCenter = goCenter;
         }
     }
 
@@ -131,61 +138,94 @@ public class ProxyPlayClient {
         if (!ProxyPlayState.reportHoldFired
                 && now - ProxyPlayState.reportHoldStart >= ProxyPlayState.REPORT_HOLD_MS) {
             ProxyPlayState.reportHoldFired = true;
-            reportOneMove(mc);
+            armReport(mc);
         }
     }
 
     /**
-     * 举报一手（整活，和代打彼此独立）：对着围棋棋盘按 J，把女仆这一手判成"停一手"。
+     * 长按完成：把举报"挂起"。
      * <p>
-     * 视觉/听觉：屏幕中央闪一行大字 + 叮一声；功能上向服务端回一个负坐标的应手
-     * （模组自己的 {@code go_to_server} 通道），服务端只校验"是否女仆回合"，因此会执行
-     * {@code go.pass(WHITE)}。没对着棋盘 / 不是女仆回合时只表演，不产生任何影响。
+     * 为什么不能按下去就直接判停：女仆的应手是**客户端**算的（模组 {@code GoSyncPayload}
+     * 回来就立刻算出并回传），一局实测 237 手只花了 100 秒 —— "女仆回合"这个窗口只有几十毫秒，
+     * 人类根本按不进去（原来要求按的时候正好轮到女仆，所以永远举报不了）。
+     * 现在改成挂起，等到能判停的那一刻自动发出。
      */
-    private static void reportOneMove(Minecraft mc) {
-        long now = System.currentTimeMillis();
-        ProxyPlayState.reportFlashUntil = now + 2500;
-        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.0F));
-        if (mc.player == null || mc.level == null) {
-            return;
-        }
-        if (now < ProxyPlayState.reportCooldownUntil) {
-            return; // 连点只表演，不重复发包
-        }
-        ProxyPlayState.reportCooldownUntil = now + 1500;
+    private static void armReport(Minecraft mc) {
+        ProxyPlayState.reportArmed = true;
+        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 1200;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 0.8F));
+        reportNotice(mc, "message.chuying.report_armed");
+        Chuying.LOGGER.info("[chuying] report: 举报已挂起，等女仆下一次应手");
+    }
 
-        if (!(mc.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
-            reportNotice(mc, "message.chuying.report_need_board");
+    /**
+     * 每 tick 检查：举报已挂起、准星对着围棋棋盘、且当前轮到女仆（白）→ 立刻把她的应手判成停一手。
+     * 这条覆盖"玩家自己手动落子"的情况（服务端同步回来后会短暂处于女仆回合）。
+     */
+    private static void tickArmedReport(Minecraft mc) {
+        if (!ProxyPlayState.reportArmed || mc.level == null
+                || !(mc.hitResult instanceof BlockHitResult hit)
+                || hit.getType() != HitResult.Type.BLOCK) {
             return;
         }
         BlockPos pos = hit.getBlockPos();
-        Block block = mc.level.getBlockState(pos).getBlock();
-        if (!Config.GO_ENABLED.get() || !GoCompat.isGoBoard(block)) {
-            reportNotice(mc, "message.chuying.report_need_board");
+        BlockEntity te = goTileAt(mc, pos);
+        if (te == null) {
             return;
         }
         GomokuPart part = GoCompat.part(mc.level.getBlockState(pos));
         if (part == null) {
-            reportNotice(mc, "message.chuying.report_need_board");
             return;
         }
-        BlockPos center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
-        BlockEntity te = mc.level.getBlockEntity(center);
-        if (!GoCompat.isGoTile(te)) {
-            reportNotice(mc, "message.chuying.report_need_board");
+        fireArmedReport(mc, pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY())), te);
+    }
+
+    /**
+     * 真正把女仆这一手判成停一手（负坐标应手）。服务端只校验"是否女仆回合"，
+     * 所以要么在她回合的 tick 里抢先发，要么在代打发完自己那一手后立刻发
+     * （同一个连接按顺序处理：点击先到、判停后到，服务端处理完点击刚好进入女仆回合）。
+     */
+    private static void fireArmedReport(Minecraft mc, BlockPos center, BlockEntity te) {
+        fireArmedReport(mc, center, te, false);
+    }
+
+    /**
+     * @param force true = 刚发完我们自己的落子，服务端处理完这一手必然进入女仆回合
+     *              （本地棋面还没同步回来，不能按 isPlayerTurn 判断，否则永远发不出去）
+     */
+    private static void fireArmedReport(Minecraft mc, BlockPos center, BlockEntity te, boolean force) {
+        if (!ProxyPlayState.reportArmed || center == null) {
             return;
         }
-        // 服务端只接受"轮到女仆（白）"的应手包；isPlayerTurn 为 true 说明该你走
-        if (GoCompat.isPlayerTurn(te)) {
-            reportNotice(mc, "message.chuying.report_not_maid_turn");
-            return;
+        if (!force && (te == null || GoCompat.isPlayerTurn(te))) {
+            return; // 还没轮到女仆，留着下次
         }
+        ProxyPlayState.reportArmed = false;
+        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 2500;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.0F));
         if (GoCompat.judgeMaidPass(te, center)) {
-            Chuying.LOGGER.info("[chuying] report: 举报一手 -> 女仆被判停一手 @ {}", center);
+            Chuying.LOGGER.info("[chuying] report: 举报成功 -> 女仆被判停一手 @ {} (force={})", center, force);
             reportNotice(mc, "message.chuying.report_done");
         } else {
             reportNotice(mc, "message.chuying.no_go_engine");
         }
+    }
+
+    /** 准星所指方块若是围棋棋盘，返回其中心方块实体（九宫反推），否则 null。 */
+    private static BlockEntity goTileAt(Minecraft mc, BlockPos pos) {
+        if (mc.level == null || !Config.GO_ENABLED.get()) {
+            return null;
+        }
+        if (!GoCompat.isGoBoard(mc.level.getBlockState(pos).getBlock())) {
+            return null;
+        }
+        GomokuPart part = GoCompat.part(mc.level.getBlockState(pos));
+        if (part == null) {
+            return null;
+        }
+        BlockPos center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+        BlockEntity te = mc.level.getBlockEntity(center);
+        return GoCompat.isGoTile(te) ? te : null;
     }
 
     private static void reportNotice(Minecraft mc, String key) {
@@ -196,12 +236,13 @@ public class ProxyPlayClient {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
         // 优先执行排队的模拟点击（象棋两步间隔）
         processPendingClicks();
-        // 举报一手：长按计时（与代打开关无关）
+        // 举报一手：长按计时 + 挂起后在女仆回合抢判（都与代打开关无关）
         tickReportKey();
+        tickArmedReport(mc);
 
-        Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) {
             return;
         }
@@ -304,6 +345,13 @@ public class ProxyPlayClient {
                 }
                 BoardClicker.sendUseItemOn(pc.hit);
                 it.remove();
+                if (pc.goCenter != null && ProxyPlayState.reportArmed) {
+                    // 围棋落子刚发出去：同一个连接按顺序到达，服务端处理完这一手就轮到女仆，
+                    // 紧跟其后的"判停包"正好落在女仆回合里（确定性抢先，不靠 tick 碰运气）。
+                    BlockEntity te = Minecraft.getInstance().level == null ? null
+                            : Minecraft.getInstance().level.getBlockEntity(pc.goCenter);
+                    fireArmedReport(Minecraft.getInstance(), pc.goCenter, te, true);
+                }
             }
         }
         if (PENDING_CLICKS.isEmpty()) {
@@ -636,7 +684,7 @@ public class ProxyPlayClient {
                     Chuying.LOGGER.warn("[chuying] go 引擎未给出着法");
                     return;
                 }
-                mc.execute(() -> scheduleGoMove(center, packed, koX, koY, board));
+                mc.execute(() -> scheduleGoMove(center, packed, koX, koY, board, te));
             } catch (Throwable t) {
                 Chuying.LOGGER.error("[chuying] go 代打异常", t);
             } finally {
@@ -646,10 +694,34 @@ public class ProxyPlayClient {
     }
 
     /** 围棋落子：{@link NativeGoEngine#PASS} 表示停一手（潜行 + 空手点击棋盘）。 */
-    private static void scheduleGoMove(BlockPos center, int packed, int koX, int koY, byte[][] board) {
+    private static void scheduleGoMove(BlockPos center, int packed, int koX, int koY, byte[][] board,
+                                       net.minecraft.world.level.block.entity.BlockEntity te) {
         Minecraft mc = Minecraft.getInstance();
         if (packed == NativeGoEngine.PASS) {
-            Chuying.LOGGER.info("[chuying] go pass");
+            // 反"停手送分"兜底：实测一局 237 手里 GNU Go 停了 82 手（对手永远不会主动停手，
+            // 它一停就等于白送）。棋盘上还有明显空的点时不接受停手，改用模组自带 GoAI 顶一手。
+            int empty = 0;
+            for (int i = 0; i < GoCompat.SIZE; i++) {
+                for (int j = 0; j < GoCompat.SIZE; j++) {
+                    if (board[i][j] == 0) {
+                        empty++;
+                    }
+                }
+            }
+            if (empty >= 10) {
+                Integer fallback = GoCompat.fallbackMove(te, board, koX, koY);
+                if (fallback != null) {
+                    int fx = fallback / 100;
+                    int fy = fallback % 100;
+                    if (fx >= 0 && fy >= 0 && fx < GoCompat.SIZE && fy < GoCompat.SIZE
+                            && board[fx][fy] == 0 && !(fx == koX && fy == koY)) {
+                        Chuying.LOGGER.info("[chuying] go 引擎想停手（空点 {}），改用兜底着法 ({},{})", empty, fx, fy);
+                        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, fx, fy), 0, false, center));
+                        return;
+                    }
+                }
+            }
+            Chuying.LOGGER.info("[chuying] go pass (空点 {})", empty);
             // 停一手：服务端判定的是 player.isShiftKeyDown()，必须先发潜行包再点棋盘
             // （复用 PVP 代打那套潜行会话）。点 (7,7) 落在棋盘中央，不会误触"棋子盒重置"区。
             PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 0, true));
@@ -673,7 +745,8 @@ public class ProxyPlayClient {
             return;
         }
         Chuying.LOGGER.info("[chuying] go move ({},{})", x, y);
-        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, x, y), 0, false));
+        // 带上中心点：这一手发出去后若"举报"已挂起，紧接着就把女仆这一手判成停一手
+        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, x, y), 0, false, center));
     }
 
     /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格；sneak 为 PVP 潜行标记 */

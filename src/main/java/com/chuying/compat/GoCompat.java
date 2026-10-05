@@ -310,4 +310,57 @@ public final class GoCompat {
             return false;
         }
     }
+
+    // ------------------------------------------------------------------
+    // 兜底选点：GNU Go 认为"无棋可下"时会停手送分（实测一局 237 手停了 82 手），
+    // 这时改用模组自带的 GoAI（贪心，但至少会吃子/围空）顶一手。
+    // ------------------------------------------------------------------
+
+    private static Method chooseMoveMethod;
+    private static boolean chooseMoveProbed = false;
+
+    private static Method chooseMove(BlockEntity te) {
+        if (chooseMoveProbed) {
+            return chooseMoveMethod;
+        }
+        chooseMoveProbed = true;
+        try {
+            String name = te.getClass().getName();
+            int cut = name.indexOf(".blockentity");
+            if (cut > 0) {
+                Class<?> ai = Class.forName(name.substring(0, cut) + ".game.GoAI");
+                chooseMoveMethod = ai.getMethod("chooseMove", byte[][].class, byte.class,
+                        int.class, int.class, int.class, java.util.Random.class);
+            }
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying] 找不到 TouhouGO 的 GoAI，停手兜底不可用", t);
+        }
+        return chooseMoveMethod;
+    }
+
+    /**
+     * 兜底选点（静态方法 {@code GoAI.chooseMove(board, BLACK, koX, koY, winCount, random)}）。
+     *
+     * @return 打包坐标 {@code x * 100 + y}；{@code null} 表示它也找不到点（那就只能停手）
+     */
+    public static Integer fallbackMove(BlockEntity te, byte[][] board, int koX, int koY) {
+        Method m = chooseMove(te);
+        if (m == null || board == null) {
+            return null;
+        }
+        try {
+            Object point = m.invoke(null, board, (byte) 1, koX, koY, 999 /* rank 4（最强档）*/,
+                    new java.util.Random());
+            if (point == null) {
+                return null;
+            }
+            Method gx = point.getClass().getMethod("x");
+            Method gy = point.getClass().getMethod("y");
+            int x = (Integer) gx.invoke(point);
+            int y = (Integer) gy.invoke(point);
+            return (x < 0 || y < 0) ? null : x * 100 + y;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
 }

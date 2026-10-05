@@ -37,12 +37,9 @@ public final class NativeGoEngine implements AutoCloseable {
      */
     public static int levelFor(int multiplier) {
         if (multiplier <= 1) {
-            return 6;
+            return 8;   // 实测原来最低档给 6 会被女仆翻盘，整体上调
         }
         if (multiplier <= 3) {
-            return 8;
-        }
-        if (multiplier <= 6) {
             return 9;
         }
         return 10;

@@ -26,6 +26,7 @@
   "hud.chuying.proxy_off": "Chuying Proxy Play: OFF",
   "hud.chuying.report": "REPORTED!",
   "hud.chuying.report_hold": "Reporting... %s",
+  "hud.chuying.report_armed": "Report armed: maid's next move is a pass",
   "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine library missing or extraction failed",
   "message.chuying.no_wchess_engine": "Chuying: Western Chess engine library missing or extraction failed",
   "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine library missing or extraction failed",
@@ -34,5 +35,6 @@
   "message.chuying.need_empty_hand": "Chuying Proxy Play: empty your main hand (the board requires an empty hand)",
   "message.chuying.report_need_board": "Chuying: aim at a Go board to report a move",
   "message.chuying.report_not_maid_turn": "Chuying: not the maid's turn, report ignored",
+  "message.chuying.report_armed": "Chuying: report armed - the maid's next reply will be judged a pass",
   "message.chuying.report_done": "Chuying: reported - the maid is penalized with a pass"
 }
