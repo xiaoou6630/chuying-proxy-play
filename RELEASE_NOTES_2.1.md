@@ -102,3 +102,59 @@ Exact commits, tar sha256 (GNU Go 3.8 tar = `da68d7a65f44dcf6ce6e4e630b6f6dd9897
 - (3) Read as their `LICENSE` file's **CC0 1.0** instead (no restrictions whatsoever), there is plainly no conflict either.
 
 **Conclusion: no licence violation under either reading.** To use Go, install TouhouGO yourself and follow its own terms (the README reading includes non-commercial use); its assets come from Touhou Little Maid. Please also never bundle TouhouGO's files into this mod's releases — that is the only way to run into the CC-NC vs GPL conflict.
+
+---
+
+# 褚嬴代打 2.1（日本語）
+
+車万女僕（Touhou Little Maid）の盤上対局を、強力なエンジンが代わりに打ってくれます。**純クライアント**なのでサーバー側の導入は不要です。
+
+**2.1 で囲碁に対応**：碁盤アドオン [TouhouGO](https://github.com/moyinsky/TouhouGO) を導入すると、15路囲碁も代打できます。エンジンは [GNU Go](https://www.gnu.org/software/gnugo/) 3.8 で、JNI ライブラリとして**ゲームプロセス内からエンジンの C API を直接呼び出します** —— サブプロセス無し、パイプ無し、テキストプロトコル無し。
+
+## 本リリースの内容（NeoForge 1.21.1 × 3プラットフォーム、計3つの jar）
+
+| プラットフォーム | ファイル |
+|---|---|
+| Windows | `Chuying.Proxy.Play2.1-NeoForge-1.21.1-windows.jar` |
+| Linux (x86-64) | `Chuying.Proxy.Play2.1-NeoForge-1.21.1-linux.jar` |
+| macOS (Apple Silicon) | `Chuying.Proxy.Play2.1-NeoForge-1.21.1-macos.jar` |
+
+> Forge 1.20.1 / Fabric 1.20.1 ブランチは今回変更なし（碁盤は 1.21.1 にのみ存在します）。そちらは 2.0 のままお使いください。
+
+## 2.1 の新機能
+
+- **囲碁代打**：TouhouGO 導入時、15路囲碁を自動で打ちます。数え子・コミ 6.5・コウ・自殺手の判定はアドオン自身の `GoRules` と一致します
+- **エンジンをプロセス内で直接呼び出し**：GNU Go は C の `FILE*` ストリームで動作するため（Windows/MinGW には `fopencookie`/`funopen` が無く、プロセス内で標準入出力を差し替えられません）、ブリッジがエンジンの C API を直接呼びます（`init_gnugo()` → 現局面の全石とコウ点を `add_stone()` → `genmove()`）。**OS プロセスは一切生成しません**
+- **「一手を通報」**（ネタ機能、既定キー **J**）：碁盤に向かって素手で 1.5 秒長押し（画面上にプログレスバーとカウントダウン、途中で離すとキャンセル）→ 石入れをクリックして盤面リセット → 一手着手 → メイドの応手をパス扱い → 自分もパス → 双方パスで数え子 → **あなたの勝ち**。現在の対局はリセットされますが、勝敗はあなたの勝ちとして記録されます
+- **自動終局**：GNU Go が「打つ手なし」と判断し、数え子であなたがリードしているときは、両者パスでそのまま終局させて**あなたの勝ち**にします（画面に金色 `收工判胜!`）。以前は無意味に盤面を埋め続けていました（最長 398 手まで）
+- **GNU Go 3.8 自身の不具合を3件修正**（Linux はたまたま通り、macOS/arm64 は必ず中止していました。`execinfo` のバックトレースで特定）：`aa_init_moves()` の `attacks[].target[]` 未初期化、`gg_sort()` の `nel == 0` 時の `size_t` アンダーフロー、`countlib`/`countstones`/`findstones` の位置ガード欠如（ネイティブの `abort()` は Minecraft の JVM ごと落とします）
+- **サイズ控えめ**：囲碁ライブラリは 6.5〜7.8 MB（macOS 6.49 / Windows 7.58 / Linux 7.79）で、**ニューラルネットの重みは不要**です
+
+## 導入時の注意
+
+- 囲碁には **TouhouGO** が必要です（クライアントとサーバーの両方に導入）。未導入でも本 MOD の動作は 2.0 と同一で、他の棋種には影響しません
+- 囲碁を打つときは**スニークを押さないでください**（スニーク + 素手クリックはアドオンの「パス」扱い。代打はキーを離すまで待ちます）
+- 思考強度の4段階は GNU Go の level **8 / 9 / 10** に対応します。「1手あたりの思考時間」設定は囲碁には効きません（GNU Go は自前の level に基づく時間配分で動きます）
+- 表示言語は簡体字中国語・English・日本語に対応し、囲碁関連の文言も含めて翻訳済みです
+
+## 前提条件
+
+| コンポーネント | 要件 |
+|---|---|
+| NeoForge | 21.1.0+（Minecraft 1.21.1） |
+| Touhou Little Maid | ≥ 1.3.0（クライアントとサーバーの両方） |
+| TouhouGO（囲碁のみ） | クライアントとサーバーの両方。未導入なら囲碁はスキップされます |
+
+## ライセンスとエンジン配布
+
+本 MOD が配布するのは JNI の**共有ライブラリ**（`.dll` / `.so` / `.dylib`）で、**`.exe` は同梱も実行もしません**。内蔵エンジン（Pikafish / Stockfish / Rapfi / GNU Go）はいずれも GNU GPL です。GNU Go は **GPL-3.0-or-later** で、GPLv3 の "v3" オプションにより本 MOD の GPL-3.0-only と互換にリンクされ、全体は GPL-3.0 として配布されます。
+
+正確な commit と tar sha256（GNU Go 3.8 tar = `da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72`）、およびビルド時に当てた全パッチは `THIRD_PARTY_LICENSES.txt` と各 jar 内の `engines/<プラットフォーム>/BUILD_INFO.txt` に記載しています。**対応ソース**（上流ソース + 本リポジトリの JNI ブリッジ `native/src/*.cpp` とパッチスクリプト `.github/scripts/build_native.sh`）は、本リポジトリの任意のリリースタグから完全に取得できます。
+
+**任意依存 TouhouGO のライセンス（違反の有無）**：上流の碁盤アドオン [TouhouGO](https://github.com/moyinsky/TouhouGO) は表示が矛盾しています —— リポジトリの `LICENSE` は **CC0 1.0**（パブリックドメイン奉献）ですが、README 冒頭は **CC BY-NC-SA 4.0** としています。本 MOD は**厳しい README の解釈**に合わせて設計されており、そのコード・素材を**同梱・複製・改変しません**（jar 内に 1 バイトも含まれません）。実行時にリフレクションで碁盤のブロックエンティティを読むだけで、送信には同アドオン自身のパケット型を使います。
+
+- ① 複製も翻案もしていないため、CC BY-NC-SA の表示義務・継承（ShareAlike）義務は**発生しません**
+- ② コードをリンクせず内容も配布しないため、**非商業（NC）制限は本 MOD の GPL-3.0 配布に伝播せず**、GPL と CC-NC の混合作品の衝突も生じません
+- ③ むしろ `LICENSE` の **CC0 1.0**（制限なし）として読めば、そもそも衝突はありません
+
+**結論：どちらの解釈でもライセンス違反はありません。** 囲碁を使う場合は TouhouGO を各自で導入し、その条件（README の解釈では非商業を含む）に従ってください。TouhouGO のファイルを本 MOD のリリースに同梱しないでください —— それだけが CC-NC と GPL の衝突を招きます。
