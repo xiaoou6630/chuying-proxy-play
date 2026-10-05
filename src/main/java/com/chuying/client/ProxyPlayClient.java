@@ -136,29 +136,22 @@ public class ProxyPlayClient {
             // 松开（或本来没按）：清掉长按状态，下次必须重新按满
             ProxyPlayState.reportHoldStart = 0;
             ProxyPlayState.reportHoldFired = false;
-            ProxyPlayState.reportWinFired = false;
             return;
         }
         if (ProxyPlayState.reportHoldStart == 0) {
             ProxyPlayState.reportHoldStart = now;
             ProxyPlayState.reportHoldFired = false;
-            ProxyPlayState.reportWinFired = false;
         }
-        long held = now - ProxyPlayState.reportHoldStart;
-        if (!ProxyPlayState.reportHoldFired && held >= ProxyPlayState.REPORT_HOLD_MS) {
+        if (!ProxyPlayState.reportHoldFired
+                && now - ProxyPlayState.reportHoldStart >= ProxyPlayState.REPORT_HOLD_MS) {
             ProxyPlayState.reportHoldFired = true;
-            armReport(mc);
-        }
-        // 继续按住：不抢时机、不用你手动点，模组自己完成「重置 → 落子 → 双停判胜」
-        if (!ProxyPlayState.reportWinFired && held >= ProxyPlayState.REPORT_WIN_HOLD_MS) {
-            ProxyPlayState.reportWinFired = true;
             instantWin(mc);
         }
     }
 
     /**
-     * 必胜连招（治"抢不到女仆回合"）：女仆应手是客户端算的、不到 1 tick 就轮回我方，
-     * 人手根本按不进那个窗口 —— 所以整套点击由我们自己发，天然没有抢时机问题：
+     * 举报一手 = 判我方获胜。整套点击由我们自己发，所以不存在"抢不到女仆回合"的问题
+     * （女仆应手是客户端算的、不到 1 tick 就轮回我方，人手按不进那个窗口）：
      * <ol>
      *   <li>空手点棋子盒 → 服务端 {@code go.reset()}，白子清零；</li>
      *   <li>天元落一子（黑 1、白 0）→ 紧接着把女仆这手判成停一手；</li>
@@ -166,7 +159,6 @@ public class ProxyPlayClient {
      * </ol>
      */
     private static void instantWin(Minecraft mc) {
-        ProxyPlayState.reportArmed = false;
         ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 2000;
         mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.4F));
         if (mc.level == null || !(mc.hitResult instanceof BlockHitResult hit)
@@ -194,86 +186,6 @@ public class ProxyPlayClient {
         PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, false, center, true));
         Chuying.LOGGER.info("[chuying] report: 必胜连招启动（重置 → 落子 → 双停判胜）@ {}", center);
         reportNotice(mc, "message.chuying.instant_win");
-    }
-
-    /**
-     * 长按完成：把举报"挂起"。
-     * <p>
-     * 为什么不能按下去就直接判停：女仆的应手是**客户端**算的（模组 {@code GoSyncPayload}
-     * 回来就立刻算出并回传），一局实测 237 手只花了 100 秒 —— "女仆回合"这个窗口只有几十毫秒，
-     * 人类根本按不进去（原来要求按的时候正好轮到女仆，所以永远举报不了）。
-     * 现在改成挂起，等到能判停的那一刻自动发出。
-     */
-    private static void armReport(Minecraft mc) {
-        ProxyPlayState.reportArmed = true;
-        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 1200;
-        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 0.8F));
-        reportNotice(mc, "message.chuying.report_armed");
-        Chuying.LOGGER.info("[chuying] report: 举报已挂起，等女仆下一次应手");
-    }
-
-    /**
-     * 每 tick 检查：举报已挂起、准星对着围棋棋盘、且当前轮到女仆（白）→ 立刻把她的应手判成停一手。
-     * 这条覆盖"玩家自己手动落子"的情况（服务端同步回来后会短暂处于女仆回合）。
-     */
-    private static void tickArmedReport(Minecraft mc) {
-        if (!ProxyPlayState.reportArmed || mc.level == null
-                || !(mc.hitResult instanceof BlockHitResult hit)
-                || hit.getType() != HitResult.Type.BLOCK) {
-            return;
-        }
-        BlockPos pos = hit.getBlockPos();
-        BlockEntity te = goTileAt(mc, pos);
-        if (te == null) {
-            return;
-        }
-        GomokuPart part = GoCompat.part(mc.level.getBlockState(pos));
-        if (part == null) {
-            return;
-        }
-        fireArmedReport(mc, pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY())), te);
-    }
-
-    /**
-     * 真正把女仆这一手判成停一手（负坐标应手）。服务端只校验"是否女仆回合"，
-     * 所以要么在她回合的 tick 里抢先发，要么在代打发完自己那一手后立刻发
-     * （同一个连接按顺序处理：点击先到、判停后到，服务端处理完点击刚好进入女仆回合）。
-     */
-    private static void fireArmedReport(Minecraft mc, BlockPos center, BlockEntity te) {
-        fireArmedReport(mc, center, te, false);
-    }
-
-    /**
-     * @param force true = 刚发完我们自己的落子，服务端处理完这一手必然进入女仆回合
-     *              （本地棋面还没同步回来，不能按 isPlayerTurn 判断，否则永远发不出去）
-     */
-    private static void fireArmedReport(Minecraft mc, BlockPos center, BlockEntity te, boolean force) {
-        if (!ProxyPlayState.reportArmed || center == null) {
-            return;
-        }
-        if (!force && (te == null || GoCompat.isPlayerTurn(te))) {
-            return; // 还没轮到女仆，留着下次
-        }
-        ProxyPlayState.reportArmed = false;
-        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 2500;
-        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.0F));
-        byte[][] board = GoCompat.board(te);
-        Integer lead = board == null ? null : GoCompat.scoreLead(te, board);
-        if (GoCompat.judgeMaidPass(te, center)) {
-            if (lead != null && lead >= 1) {
-                // 举报＋判决：女仆这一手判停一手；回合回到我方后再停一手 → 双停 → 数子终局 → 判我方胜
-                PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, true));
-                Chuying.LOGGER.info("[chuying] report: 举报判胜（领先 {} 目）-> 女仆停一手 + 我方停一手 @ {}",
-                        lead, center);
-                reportNotice(mc, "message.chuying.report_win");
-            } else {
-                Chuying.LOGGER.info("[chuying] report: 举报成功 -> 女仆被判停一手 @ {} (force={}, 领先={})",
-                        center, force, lead);
-                reportNotice(mc, "message.chuying.report_done");
-            }
-        } else {
-            reportNotice(mc, "message.chuying.no_go_engine");
-        }
     }
 
     /** 收工：我方那手"停一手"已经发出，这里紧接着把女仆的应手也判成停一手 → 双方连续停手 → 数子终局。 */
@@ -326,9 +238,8 @@ public class ProxyPlayClient {
         Minecraft mc = Minecraft.getInstance();
         // 优先执行排队的模拟点击（象棋两步间隔）
         processPendingClicks();
-        // 举报一手：长按计时 + 挂起后在女仆回合抢判（都与代打开关无关）
+        // 举报一手：长按计时（与代打开关无关）
         tickReportKey();
-        tickArmedReport(mc);
 
         if (mc.player == null || mc.level == null) {
             return;
@@ -438,12 +349,6 @@ public class ProxyPlayClient {
                     BlockEntity te = Minecraft.getInstance().level == null ? null
                             : Minecraft.getInstance().level.getBlockEntity(pc.goCenter);
                     finishGameByDoublePass(Minecraft.getInstance(), pc.goCenter, te);
-                } else if (pc.goCenter != null && ProxyPlayState.reportArmed) {
-                    // 围棋落子刚发出去：同一个连接按顺序到达，服务端处理完这一手就轮到女仆，
-                    // 紧跟其后的"判停包"正好落在女仆回合里（确定性抢先，不靠 tick 碰运气）。
-                    BlockEntity te = Minecraft.getInstance().level == null ? null
-                            : Minecraft.getInstance().level.getBlockEntity(pc.goCenter);
-                    fireArmedReport(Minecraft.getInstance(), pc.goCenter, te, true);
                 }
             }
         }

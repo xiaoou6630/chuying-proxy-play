@@ -22,23 +22,12 @@ public final class ProxyPlayState {
     public static volatile int lastGoCounter = -1;
     /** "举报一手" 需要长按的时间（毫秒）：按住 J 到进度条走满才触发，松开即取消 */
     public static final long REPORT_HOLD_MS = 1500;
-    /** 继续按住到这个时长 = "必胜连招"（点棋子盒重置 → 落一子 → 双停判胜） */
-    public static final long REPORT_WIN_HOLD_MS = 3000;
-    /** 本次长按是否已触发过必胜连招 */
-    public static volatile boolean reportWinFired = false;
     /** "举报一手" 长按开始的时间戳（0 = 没按住） */
     public static volatile long reportHoldStart = 0;
     /** 本次长按是否已触发过（按住不放不会连续触发，需松开重按） */
     public static volatile boolean reportHoldFired = false;
-    /**
-     * 举报已"挂起"：长按完成后进入这个状态，等女仆下一次该走子时立刻把她的应手判成停一手。
-     * 因为女仆应手是客户端算的、几十毫秒就轮回到玩家，靠"按的时候正好轮到女仆"是抓不到的。
-     */
-    public static volatile boolean reportArmed = false;
     /** "举报一手" HUD 大字显示到什么时候（毫秒时间戳） */
     public static volatile long reportFlashUntil = 0;
-    /** "举报一手" 冷却结束时间戳，防止连点刷屏 */
-    public static volatile long reportCooldownUntil = 0;
 
     private ProxyPlayState() {
     }

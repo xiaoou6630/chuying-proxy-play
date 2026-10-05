@@ -30,20 +30,9 @@ public class ProxyPlayOverlay implements LayeredDraw.Layer {
             Component countdown = Component.translatable("hud.chuying.report_hold",
                     String.format("%.1f", (1F - ratio) * ProxyPlayState.REPORT_HOLD_MS / 1000F));
             guiGraphics.drawCenteredString(font, countdown, cx, y - 12, 0xFFFFAA);
-            if (ProxyPlayState.reportHoldFired) {
-                // 已进入举报，继续按住就是必胜连招
-                Component win = Component.translatable("hud.chuying.report_win_hold");
-                guiGraphics.drawCenteredString(font, win, cx, y - 24, 0xFF55FF);
-            }
         }
 
-        // 举报已挂起：等女仆下一次应手时自动判停（因为几十毫秒就轮回玩家，按不住）
-        if (ProxyPlayState.reportArmed) {
-            Component armed = Component.translatable("hud.chuying.report_armed");
-            guiGraphics.drawCenteredString(font, armed, cx, cy - 62, 0xFFAA55);
-        }
-
-        // 举报一手：无论代打开关都显示（整活优先）
+        // 举报一手（= 判我方获胜）：无论代打开关都显示（整活优先）
         if (System.currentTimeMillis() < ProxyPlayState.reportFlashUntil) {
             Component report = Component.translatable("hud.chuying.report");
             int y = cy - 60;
