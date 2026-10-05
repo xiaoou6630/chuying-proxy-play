@@ -1,11 +1,11 @@
-# 临时 POC：JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi/gnugo）三平台编译。
-# poc/native-dll：不 spawn OS 进程路线的验证分支；go：围棋（GNU Go）接入分支。
+# JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi/gnugo）三平台编译。
+# 2.1 起 native/ 源码随发布树分发，故在发布线（main / neoforge1.21.1-2.1）即可复现构建。
 # 产物 90 天过期。
 name: native-build
 
 on:
   push:
-    branches: [poc/native-dll, go]
+    branches: [poc/native-dll, neoforge1.21.1-2.1]
   workflow_dispatch:
 
 permissions:
