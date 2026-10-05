@@ -144,9 +144,13 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
     set(CMAKE_C_STANDARD 90)
     set(CMAKE_C_STANDARD_REQUIRED OFF)
     if(NOT MSVC)
+        # -Wimplicit-function-declaration 故意**打开**（配 -Wno-error=… 不让它变成错误）：
+        # 缺原型的调用在 64 位下会把指针/64 位返回值截断成 int，是这类老代码最典型的
+        # "读到垃圾位置值"来源；保留告警便于在 CI 日志里核对。
         add_compile_options(
             "$<$<COMPILE_LANGUAGE:C>:-fcommon>"
-            "$<$<COMPILE_LANGUAGE:C>:-Wno-implicit-function-declaration>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wimplicit-function-declaration>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-error=implicit-function-declaration>"
             "$<$<COMPILE_LANGUAGE:C>:-Wno-int-conversion>"
             "$<$<COMPILE_LANGUAGE:C>:-Wno-implicit-int>"
             "$<$<COMPILE_LANGUAGE:C>:-Wno-builtin-declaration-mismatch>"
