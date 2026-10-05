@@ -116,3 +116,5 @@ JNI 桥接层与 CMake 脚本（`native/CMakeLists.txt`、`native/src/*.cpp`）*
 **GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi / GNU Go）同为 GNU GPL（GNU Go 为 GPL-3.0-or-later，按 GPLv3 的 "v3" 选项链接进整体，许可兼容）；本模组把它们链接进同一进程，整体仍以 GPL-3.0 分发。引擎版本与精确 commit / tar 包 sha256、以及构建期所打的全部补丁（含 GNU Go 3.8 的三处老 C 缺陷修复）见 `THIRD_PARTY_LICENSES.txt` 与构建产物内的 `BUILD_INFO.txt`。
 
 **对应源码（GPLv3 Corresponding Source）**：引擎源码取自上游（GNU Go = 官方 tar，sha256 固定为 `da68d7a6…6a72`），本模组的修改（JNI 桥接层 `native/src/*.cpp` 与 `native/CMakeLists.txt`）与构建期补丁脚本 `.github/scripts/build_native.sh` 都在本仓库内，从任意发布 tag（如 `2.1`）即可完整取得，据此可复现出与发布包完全一致的引擎二进制。
+
+**可选依赖的许可（仅运行时互操作，不分发其内容）**：围棋棋盘 [TouhouGO](https://github.com/moyinsky/TouhouGO) 上游声明不一致 —— 仓库 `LICENSE` 是 **CC0 1.0**（公共领域），README 首行却写 **CC BY-NC-SA 4.0**。本模组按**更严格的 README 口径**处理：**不打包、不复制、不修改它的任何代码与素材**，只在运行时用反射读取棋盘、并以它自己的网络包类型发送数据。因此 ① 不触发 CC 的署名与「相同方式共享」义务，② 其「非商业(NC)」限制不会传染到本模组的 GPL-3.0 分发 —— **两种口径下都不存在许可冲突**。使用围棋功能请自行安装 TouhouGO 并遵守其条款（含非商业限制），**不要**把它的文件打进本模组的发布包；详细说明见 `THIRD_PARTY_LICENSES.txt`。

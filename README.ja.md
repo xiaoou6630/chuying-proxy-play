@@ -117,3 +117,5 @@ JNI ブリッジと CMake スクリプト（`native/CMakeLists.txt`、`native/sr
 **GPL-3.0-only** —— 内蔵エンジン（Pikafish / Stockfish / Rapfi / GNU Go）も GPL（GNU Go は GPL-3.0-or-later で、GPLv3 の "v3" オプションにより全体へリンク可能＝互換）。同一プロセスへリンクしているため、全体を GPL-3.0 として配布します。エンジンのバージョン・正確な commit・tar の sha256・ビルド時の全パッチは `THIRD_PARTY_LICENSES.txt` と、ネイティブライブラリに同梱される `BUILD_INFO.txt` に記載しています。
 
 **対応ソース（GPLv3 Corresponding Source）**：エンジンのソースは上流から取得（GNU Go = 公式 tar、sha256 `da68d7a6…6a72` 固定）。本 MOD の改変（`native/src/*.cpp` の JNI ブリッジと `native/CMakeLists.txt`）およびパッチスクリプト `.github/scripts/build_native.sh` は本リポジトリにあり、任意のリリースタグ（例：`2.1`）から完全に取得できます。
+
+**任意依存のライセンス（実行時相互運用のみ・相手の内容は同梱しません）**：碁盤アドオン [TouhouGO](https://github.com/moyinsky/TouhouGO) は上流の表示が矛盾しています（`LICENSE` は **CC0 1.0**＝パブリックドメイン、README 冒頭は **CC BY-NC-SA 4.0**）。本 MOD は**厳しい README の解釈**に従い、そのコード・素材を**同梱・複製・改変しません**（実行時にリフレクションで盤面を読み、送信は同アドオン自身のパケット型を使用するのみ）。したがって ① CC の表示・継承（ShareAlike）義務は発生せず、② 非商業（NC）制限が本 MOD の GPL-3.0 配布へ伝播することもありません —— **どちらの解釈でもライセンス衝突はありません**。囲碁を使う場合は TouhouGO を各自で導入し、その条件（非商業を含む）に従ってください。本 MOD のリリースに同アドオンのファイルを同梱しないでください。詳細は `THIRD_PARTY_LICENSES.txt` を参照。

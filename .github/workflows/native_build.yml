@@ -1,11 +1,10 @@
 # JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi/gnugo）三平台编译。
-# 2.1 起 native/ 源码随发布树分发，故在发布线（main / neoforge1.21.1-2.1）即可复现构建。
+# 2.1 起 native/ 源码随发布树分发，因此在任意分支上**手动触发**即可复现构建。
+# 只保留 workflow_dispatch：push 不再自动编译（一次三平台构建约 10 分钟，日常提交不需要）。
 # 产物 90 天过期。
 name: native-build
 
 on:
-  push:
-    branches: [poc/native-dll, neoforge1.21.1-2.1]
   workflow_dispatch:
 
 permissions:

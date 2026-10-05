@@ -47,6 +47,14 @@
 
 精确 commit / tar 包 sha256（GNU Go 3.8 tar = `da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72`）与全部构建期补丁见 `THIRD_PARTY_LICENSES.txt` 及 jar 内 `engines/<平台>/BUILD_INFO.txt`；**对应源码**（上游源码 + 本仓库的 JNI 桥接层 `native/src/*.cpp` 与补丁脚本 `.github/scripts/build_native.sh`）随本仓库任意发布 tag 完整可得。
 
+**可选依赖 TouhouGO 的许可（是否违规）**：围棋棋盘模组 [TouhouGO](https://github.com/moyinsky/TouhouGO) 上游声明不一致 —— 其仓库 `LICENSE` 是 **CC0 1.0**（公共领域奉献），而 README 首行写的是 **CC BY-NC-SA 4.0**。本 mod 按**更严格的 README 口径**设计：**不打包、不复制、不修改它的任何代码与素材**（jar 内没有一个它的字节），只在运行时用反射读取棋盘方块实体，并以它自己的网络包类型发送数据来完成代打。由此：
+
+- ① 未复制、未改编其作品 → **不触发** CC BY-NC-SA 的署名与「相同方式共享」义务；
+- ② 未链接其代码、未分发其内容 → 其**非商业（NC）限制不会传染**到本 mod 的 GPL-3.0 分发，也不构成 GPL 与 CC-NC 的混合作品冲突；
+- ③ 即使按其 `LICENSE` 的 **CC0 1.0** 理解（无任何限制），更是毫无冲突。
+
+**结论：两种口径下都不存在许可违规。** 玩家使用围棋功能需自行安装 TouhouGO，并遵守其自身条款（README 口径含非商业限制；其素材源自《车万女仆》本体）。也请勿把 TouhouGO 的文件打进本 mod 的发布包 —— 那才会同时踩到 CC 侧的 NC 与 GPL 的冲突。
+
 ---
 
 # Chuying Proxy Play 2.1 (English)
@@ -86,3 +94,11 @@ Let strong engines play the Touhou Little Maid board games for you. Pure client-
 This mod ships JNI **shared libraries** (`.dll` / `.so` / `.dylib`) — it does **not** contain or execute any `.exe`. All bundled engines (Pikafish / Stockfish / Rapfi / GNU Go) are GNU GPL; GNU Go is **GPL-3.0-or-later**, linked into the combined work under GPLv3's "v3" option, which is compatible with this mod's GPL-3.0-only, so the whole is distributed under GPL-3.0.
 
 Exact commits, tar sha256 (GNU Go 3.8 tar = `da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72`) and every build-time patch are listed in `THIRD_PARTY_LICENSES.txt` and in `engines/<platform>/BUILD_INFO.txt` inside each jar. The **corresponding source** (upstream sources plus this repository's JNI bridges in `native/src/*.cpp` and the patch script `.github/scripts/build_native.sh`) is available in full from any release tag of this repository.
+
+**Optional dependency TouhouGO — is there any licence violation?** The upstream Go-board addon [TouhouGO](https://github.com/moyinsky/TouhouGO) contradicts itself: its repository `LICENSE` is **CC0 1.0** (public-domain dedication), while the README states **CC BY-NC-SA 4.0**. This mod is built for the **stricter README reading**: it bundles, copies and modifies **none** of its code or assets (not a single byte of it is inside the jar) — it only reads the board's block entity through reflection at runtime and sends data using that addon's own packet type.
+
+- (1) No copying or adaptation of their work → **no** CC attribution or share-alike obligation is triggered;
+- (2) Their code is not linked and their content is not distributed → the **non-commercial (NC) restriction does not propagate** to this mod's GPL-3.0 distribution, so there is no GPL / CC-NC combined-work conflict;
+- (3) Read as their `LICENSE` file's **CC0 1.0** instead (no restrictions whatsoever), there is plainly no conflict either.
+
+**Conclusion: no licence violation under either reading.** To use Go, install TouhouGO yourself and follow its own terms (the README reading includes non-commercial use); its assets come from Touhou Little Maid. Please also never bundle TouhouGO's files into this mod's releases — that is the only way to run into the CC-NC vs GPL conflict.
