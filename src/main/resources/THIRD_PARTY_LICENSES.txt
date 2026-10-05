@@ -41,9 +41,23 @@ Chuying Proxy Play（褚嬴代打）内置四个开源棋类引擎。自 2.0 起
             的 ADD_EXECUTABLE 在构建期改为 STATIC 库）。与另外三个引擎不同，围棋**不**
             走 stdin/stdout 文本协议（GNU Go 用的是 C 的 FILE* 流，Windows/MinGW 没有
             fopencookie/funopen 无法在进程内重定向），而是由桥接层直接调用其引擎 C API：
-            init_gnugo() -> 整盘覆写 board[]/board_ko_pos -> genmove()。
-            桥接层见 native/src/gnugo_bridge.cpp。
+            init_gnugo() -> gnugo_clear_board() + 逐个 add_stone() 摆当前棋面与劫点 ->
+            genmove()。桥接层见 native/src/gnugo_bridge.cpp。
    无权重:  GNU Go 是纯读取式引擎，不需要神经网络权重文件。
+   构建期补丁（全部公开在 .github/scripts/build_native.sh，可复现）:
+             a) interface/CMakeLists.txt：ADD_EXECUTABLE -> ADD_LIBRARY STATIC；
+             b) patterns/CMakeLists.txt：GET_TARGET_PROPERTY(... LOCATION) 改为生成器
+                表达式 $<TARGET_FILE:...>（CMake >= 3 的 CMP0026 禁止配置期读取 LOCATION）；
+             c) 用 -fcommon 等开关适配现代编译器（GCC 10+/Clang 11+ 默认 -fno-common）；
+             d) **三处 GNU Go 3.8 自身缺陷修复**（Linux 只是靠未初始化内存恰好为 0 侥幸
+                通过，macOS/arm64 必现 abort；用 execinfo 调用栈定位到崩点）:
+                  1. engine/combination.c: aa_init_moves() 只设 attacks[0].move 哨兵，
+                     target[] 其余槽位是未初始化栈内存，会被 aa_sort_moves()/get_aa_value()
+                     当作目标位置使用 -> 改为整数组初始化；
+                  2. utils/gg_utils.c: gg_sort() 没有 nel < 2 保护，nel == 0 时
+                     end = base + width * (nel - 1) 会 size_t 下溢 -> 加早退；
+                  3. engine/board.c: countlib/countstones/findstones 收到非法位置时改为
+                     返回 0（进程内引擎不能让 abort 连坐杀掉整个 Minecraft JVM）。
 
 ------------------------------------------------------------------------------
 GPL 合规说明（对应源码获取方式）

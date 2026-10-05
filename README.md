@@ -27,6 +27,7 @@
 | **引擎自动解压** | 内置 Windows / Linux / macOS 原生库，首次运行解压到 `config/chuying/engines/` |
 | **将棋联动** | 装了将棋扩展 [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) 也照样代打（走它自带的 Sunfish，不额外占体积） |
 | **棋圣 PVP 代打** | 装了棋圣 [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) 时支持 PVP 代打：只替自己在对局中的一方落子（需该扩展支持的潜行点击交互） |
+| **围棋代打** | 装了 [TouhouGO](https://github.com/moyinsky/TouhouGO)（车万女仆·围棋棋盘）时支持围棋：15 路、数子规则，GNU Go 引擎**进程内直调** |
 | **三语界面** | 简体中文、English、日本語 |
 | **调试 HELL** | 强制五子棋女仆最高难度 HELL（纯客户端，测试用） |
 
@@ -38,6 +39,7 @@
 | 中国象棋 | [皮卡鱼 Pikafish](https://github.com/official-pikafish/Pikafish) | UCI | 内置，随 jar 分发 |
 | 国际象棋 | [Stockfish](https://github.com/official-stockfish/Stockfish) | UCI | 内置，随 jar 分发 |
 | 将棋 | `tlm_shogi` 自带的 Sunfish | 反射调用 | 不随本模组分发，装了扩展才启用 |
+| 围棋 | [GNU Go](https://www.gnu.org/software/gnugo/) 3.8 | 引擎 C API（进程内直调） | 内置，随 jar 分发；棋盘来自 TouhouGO |
 
 ## 三平台分发包
 
@@ -57,6 +59,7 @@
 
 - NeoForge `21.1.0+`（Minecraft 1.21.1）
 - [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) ≥ `1.3.0` —— 客户端与服务端都需要（棋盘来自它）
+- **[TouhouGO](https://github.com/moyinsky/TouhouGO)（可选，只有围棋代打需要）** —— 车万女仆的围棋棋盘扩展，客户端与服务端都要装
 
 ## 安装
 
@@ -71,17 +74,22 @@
 - 走到棋盘旁，**保持空手**（棋盘本身要求空手操作），代打会自动落子
 - 将棋棋盘同样适用（需安装 `tlm_shogi` 将棋扩展）；升变选择会由代打自动应答
 - 装了棋圣 `ChessPVP` 时同样适用：只在双方都加入、且轮到你所属那一方（红/白 或 黑）时代打，旁观者不介入
+- 装了 `TouhouGO` 时围棋同样适用：**落子时别按着潜行键**（潜行 + 空手点击是"停一手"，代打会等你松手）；引擎认为该停一手时，代打会自动帮你停一手
 - 设置 → 模组 → 褚嬴代打 → Config：
   - **思考强度**：低（放水）→ 默认 → 高 → 极致（越高越稳、越少失子）；将棋同样按此档位（默认 10 秒/深度 20，碾压女仆默认档）
   - **避和强度**（仅国象）：关闭 / 温和 / 激进 / 极致 —— 避免强制和棋
   - **将棋代打**：装了 `tlm_shogi` 时可用，关掉即不介入将棋
+  - **围棋代打**：装了 `TouhouGO` 时可用，关掉即不介入围棋；思考强度档位映射到 GNU Go 的 level 6 / 8 / 9 / 10
 
 ## 纯客户端原理
 
 - 引擎在客户端本地算招，把走法逆推为棋盘交叉点的 3D 命中坐标，用**原版** `ServerboundUseItemOnPacket`（模拟右键）发送
 - 服务器只当玩家在正常点击棋盘，由它已装的 TLM 完成落子 —— **服务器零改动、零依赖**
 - 中国象棋/国际象棋为"选子→落子"两步模拟点击，五子棋/将棋按各自棋盘的分块偏移换算后点击
-- 引擎侧：三家引擎的 `main()` 在构建期被重命名并链接进 JNI 原生库，`std::cin/std::cout` 被重定向到内存队列，因此**在游戏进程内跑完整 UCI/pbrain 循环，全程不创建进程**
+- 围棋（TouhouGO）与五子棋的九宫格几何**逐字节相同**，直接复用同一套交叉点换算（已穷举验证 225 点 × 4 朝向）
+- 引擎侧：前三家引擎的 `main()` 在构建期被重命名并链接进 JNI 原生库，`std::cin/std::cout` 被重定向到内存队列，因此**在游戏进程内跑完整 UCI/pbrain 循环，全程不创建进程**
+- 围棋引擎是 C 程序，走的是 `FILE*` 流（Windows/MinGW 没有 `fopencookie`/`funopen`，无法在进程内重定向），因此改为直接调用它的引擎 C API：`init_gnugo()` → `add_stone()` 摆当前棋面 + 注入劫点 → `genmove()`（见 `native/src/gnugo_bridge.cpp`）—— 同样**零子进程、零管道、零文本协议**
+- **不与 TouhouGO 的自定义协议冲突**：落子只发原版 `ServerboundUseItemOnPacket`；本模组既不发送也不拦截它的 `go_to_client` / `go_to_server` 通道，女仆应手仍由该模组自己的客户端 AI 流程计算
 
 ## 国际化
 
@@ -101,4 +109,4 @@
 
 ## 许可证
 
-**GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi）同为 GPL-3.0；本模组把它们链接进同一进程，整体仍以 GPL-3.0 分发。引擎版本与精确 commit、以及构建期所打的全部补丁见 `THIRD_PARTY_LICENSES.txt` 与构建产物内的 `BUILD_INFO.txt`。
+**GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi / GNU Go）同为 GNU GPL（GNU Go 为 GPL-3.0-or-later，与 GPL-3.0 兼容）；本模组把它们链接进同一进程，整体仍以 GPL-3.0 分发。引擎版本与精确 commit / tar 包 sha256、以及构建期所打的全部补丁（含 GNU Go 3.8 的三处老 C 缺陷修复）见 `THIRD_PARTY_LICENSES.txt` 与构建产物内的 `BUILD_INFO.txt`。
