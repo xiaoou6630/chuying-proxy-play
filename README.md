@@ -75,11 +75,13 @@
 - 将棋棋盘同样适用（需安装 `tlm_shogi` 将棋扩展）；升变选择会由代打自动应答
 - 装了棋圣 `ChessPVP` 时同样适用：只在双方都加入、且轮到你所属那一方（红/白 或 黑）时代打，旁观者不介入
 - 装了 `TouhouGO` 时围棋同样适用：**落子时别按着潜行键**（潜行 + 空手点击是"停一手"，代打会等你松手）；引擎认为该停一手时，代打会自动帮你停一手
+- 代打自己会**见好就收**：围棋引擎认为"无棋可下"、而按模组数子我方已领先时，代打会判双方停一手直接终局判胜（金色大字 `收工判胜！`），不再无意义地填满棋盘
+- **围棋「举报一手」**（整活）：对着围棋棋盘、**空手**长按 **J** 1.5 秒（屏幕上有进度条与倒计时，提前松手即取消）→ 自动完成「点棋子盒重置 → 天元落子 → 女仆这一手判停一手 → 我方停一手」→ 双方连续停手触发数子 → **直接判我方获胜**（红色大字 `举报一手！`）。代价是当前这盘棋会被重置，但胜负照算你赢
 - 设置 → 模组 → 褚嬴代打 → Config：
   - **思考强度**：低（放水）→ 默认 → 高 → 极致（越高越稳、越少失子）；将棋同样按此档位（默认 10 秒/深度 20，碾压女仆默认档）
   - **避和强度**（仅国象）：关闭 / 温和 / 激进 / 极致 —— 避免强制和棋
   - **将棋代打**：装了 `tlm_shogi` 时可用，关掉即不介入将棋
-  - **围棋代打**：装了 `TouhouGO` 时可用，关掉即不介入围棋；思考强度档位映射到 GNU Go 的 level 6 / 8 / 9 / 10
+  - **围棋代打**：装了 `TouhouGO` 时可用，关掉即不介入围棋；思考强度档位映射到 GNU Go 的 level 8 / 9 / 10（低 / 默认 / 高与极致）
 
 ## 纯客户端原理
 
@@ -89,7 +91,7 @@
 - 围棋（TouhouGO）与五子棋的九宫格几何**逐字节相同**，直接复用同一套交叉点换算（已穷举验证 225 点 × 4 朝向）
 - 引擎侧：前三家引擎的 `main()` 在构建期被重命名并链接进 JNI 原生库，`std::cin/std::cout` 被重定向到内存队列，因此**在游戏进程内跑完整 UCI/pbrain 循环，全程不创建进程**
 - 围棋引擎是 C 程序，走的是 `FILE*` 流（Windows/MinGW 没有 `fopencookie`/`funopen`，无法在进程内重定向），因此改为直接调用它的引擎 C API：`init_gnugo()` → `add_stone()` 摆当前棋面 + 注入劫点 → `genmove()`（见 `native/src/gnugo_bridge.cpp`）—— 同样**零子进程、零管道、零文本协议**
-- **不与 TouhouGO 的自定义协议冲突**：落子只发原版 `ServerboundUseItemOnPacket`；本模组既不发送也不拦截它的 `go_to_client` / `go_to_server` 通道，女仆应手仍由该模组自己的客户端 AI 流程计算
+- **不与 TouhouGO 的自定义协议冲突**：代打落子只发原版 `ServerboundUseItemOnPacket`，女仆的应手仍由该模组自己的客户端 AI 流程计算，本模组不注册、不拦截它的 `go_to_client` / `go_to_server` 通道。唯一的例外是「举报一手」：它**以"女仆的应手"为名义**发一个负坐标（等价于该模组自己的"女仆停一手"，服务端只校验回合与合法性），属于玩家主动触发的整活功能，不改动、也不新增任何协议字段
 
 ## 国际化
 
@@ -98,6 +100,8 @@
 ## 开发者：本地构建
 
 引擎二进制（以及将棋用的扩展 jar）不进 git 仓库：由 GitHub Actions `native-build` 工作流在 CI 上拉取引擎源码、编译成三平台 JNI 原生库并上传 artifact；下载后放进 `src/main/resources/engines/<平台>/`，权重等数据文件放 `engines/shared/`。
+
+JNI 桥接层与 CMake 脚本（`native/CMakeLists.txt`、`native/src/*.cpp`）**随仓库分发**（2.1 起也在发布 tag 内），补丁与应用方式全在 `.github/scripts/build_native.sh`。
 
 ```bash
 # 1. 把 CI 产物 chuying_*.dll|so|dylib 放进 src/main/resources/engines/{windows,linux,macos}/
@@ -109,4 +113,6 @@
 
 ## 许可证
 
-**GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi / GNU Go）同为 GNU GPL（GNU Go 为 GPL-3.0-or-later，与 GPL-3.0 兼容）；本模组把它们链接进同一进程，整体仍以 GPL-3.0 分发。引擎版本与精确 commit / tar 包 sha256、以及构建期所打的全部补丁（含 GNU Go 3.8 的三处老 C 缺陷修复）见 `THIRD_PARTY_LICENSES.txt` 与构建产物内的 `BUILD_INFO.txt`。
+**GPL-3.0-only** —— 内置引擎（Pikafish / Stockfish / Rapfi / GNU Go）同为 GNU GPL（GNU Go 为 GPL-3.0-or-later，按 GPLv3 的 "v3" 选项链接进整体，许可兼容）；本模组把它们链接进同一进程，整体仍以 GPL-3.0 分发。引擎版本与精确 commit / tar 包 sha256、以及构建期所打的全部补丁（含 GNU Go 3.8 的三处老 C 缺陷修复）见 `THIRD_PARTY_LICENSES.txt` 与构建产物内的 `BUILD_INFO.txt`。
+
+**对应源码（GPLv3 Corresponding Source）**：引擎源码取自上游（GNU Go = 官方 tar，sha256 固定为 `da68d7a6…6a72`），本模组的修改（JNI 桥接层 `native/src/*.cpp` 与 `native/CMakeLists.txt`）与构建期补丁脚本 `.github/scripts/build_native.sh` 都在本仓库内，从任意发布 tag（如 `2.1`）即可完整取得，据此可复现出与发布包完全一致的引擎二进制。

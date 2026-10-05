@@ -35,6 +35,7 @@ Chuying Proxy Play（褚嬴代打）内置四个开源棋类引擎。自 2.0 起
 4) GNU Go（围棋引擎）
    Source:  https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz （GNU Go 3.8 稳定版；
             官网 https://www.gnu.org/software/gnugo/）
+            tar sha256: da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72
    License: GNU General Public License v3.0 or later（GPL-3.0-or-later，
             源码头文件写明 "version 3 ... or (at your option) any later version"）
    说明:    随 jar 分发的 chuying_gnugo 原生库链接 GNU Go 源码（interface/CMakeLists.txt
@@ -66,6 +67,11 @@ GPL 合规说明（对应源码获取方式）
 同样以 GPL-3.0-only 发布（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
 
 GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
+  - 对应源码落点：引擎源码本体取自上游（GNU Go = 上述官方 tar，sha256 已固定），
+    本 mod 的修改（JNI 桥接层 native/src/*.cpp、native/CMakeLists.txt）随本仓库公开，
+    构建期所打的全部补丁见 .github/scripts/build_native.sh —— 上游源码 + 本仓库的
+    桥接层与补丁脚本合起来即 GPLv3 意义上的 Corresponding Source，可从任意发布
+    tag（如 2.1）完整取到（2.1 起 native/ 追踪在发布树内）；
   - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库/官方 tar 包按固定
     commit / 固定 sha256 拉取；
   - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录四个引擎的仓库地址与
