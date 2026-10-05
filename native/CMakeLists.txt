@@ -172,7 +172,14 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
         "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
     # GNU Go 的头文件按 C 声明，桥是 C++：HAVE_CONFIG_H 让它们读到 CMake 生成的 config.h
     target_compile_definitions(chuying_gnugo PRIVATE HAVE_CONFIG_H)
-    target_link_libraries(chuying_gnugo PRIVATE gnugo)
+    # GNU Go 的静态库之间是循环依赖（engine <-> patterns，engine -> sgf），而它们的
+    # CMakeLists 没有声明依赖，单遍扫描的 ld（Windows/MinGW 尤其明显）会报未定义符号
+    # （实测：libengine.a(board.c.obj) undefined reference to sgftreeAddComment）。
+    # 显式按序重复列一遍即可满足两轮解析，三平台通用。
+    target_link_libraries(chuying_gnugo PRIVATE
+        gnugo
+        engine patterns sgf utils
+        engine patterns sgf utils)
     if(CHUYING_WIN_STATIC_LINK)
         target_link_options(chuying_gnugo PRIVATE ${CHUYING_WIN_STATIC_LINK})
     endif()

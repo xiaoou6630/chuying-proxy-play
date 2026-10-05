@@ -117,6 +117,12 @@ Java_com_chuying_engine_GoNativeBridge_nativeNewGame(JNIEnv*, jobject, jint boar
  * flat 为 boardsize*boardsize 的棋盘，索引 [x * size + y]，取值 0 空 / 1 黑 / 2 白（模组编码）。
  * koX/koY 为模组记录的劫点，-1 表示无劫。
  * 返回落子数，失败返回 -1。
+ *
+ * 注意：不能用 `board[pos] = color` 直接写棋盘数组 —— GNU Go 的棋串/气/哈希表数据
+ * 由 add_stone()/remove_stone() 维护，直接赋值会留下不自洽的状态，genmove 里
+ * 立刻踩断言（实测：board.c:1518 countlib(NO_MOVE) "You stepped on a bug"）。
+ * 这里走 GNU Go 自己的摆子入口（gnugo_play_sgfnode 处理 SGF AB/AW 用的也是它）：
+ * 先 gnugo_clear_board() 复位，再逐个 add_stone()。
  */
 JNIEXPORT jint JNICALL
 Java_com_chuying_engine_GoNativeBridge_nativeSetPosition(JNIEnv* env, jobject, jbyteArray flat,
@@ -134,23 +140,22 @@ Java_com_chuying_engine_GoNativeBridge_nativeSetPosition(JNIEnv* env, jobject, j
         return -1;
     }
 
-    // 保险：board_size 决定 POS()/I()/J() 的可用范围，必须与棋盘一致
-    board_size = g_boardsize;
+    // 复位棋盘（同时清掉劫点/手数/提子数；komi 是独立全局量，不受影响）
+    gnugo_clear_board(g_boardsize);
 
     int placed = 0;
     for (int x = 0; x < g_boardsize; ++x) {
         for (int y = 0; y < g_boardsize; ++y) {
             const int v = cells[x * g_boardsize + y] & 0xff;
+            if (v != 1 && v != 2) {
+                continue;
+            }
             const int pos = POS(x, y);
             if (pos < 0 || pos >= BOARDSIZE) {
                 continue;
             }
-            if (v == 1 || v == 2) {
-                board[pos] = static_cast<Intersection>(toGnuColor(v));
-                ++placed;
-            } else {
-                board[pos] = static_cast<Intersection>(EMPTY);
-            }
+            add_stone(pos, toGnuColor(v));
+            ++placed;
         }
     }
     env->ReleaseByteArrayElements(flat, cells, JNI_ABORT);
