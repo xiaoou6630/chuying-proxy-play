@@ -82,6 +82,24 @@ extract_7z "$TMP/pikafish.7z" "$TMP/pkf"
 cp "$TMP/pkf/pikafish.nnue" "$ENGINES/pikafish/src/pikafish.nnue"
 ls -la "$ENGINES/pikafish/src/pikafish.nnue"
 
+# GNU Go（围棋，GPL-3.0-or-later）：稳定版 3.8 从 ftp.gnu.org 取 tar 包并锁定 sha256。
+# 与另外三个引擎不同：它不进 native/CMakeLists 的 chuying_bridge()（文本协议桥），
+# 而是编译成静态库，由 native/src/gnugo_bridge.cpp 直接调它的 C API（进程内、无子进程）。
+log "fetching GNU Go 3.8"
+GNUG0_TARBALL="https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz"
+curl -fsSL --retry 3 --retry-delay 2 "$GNUG0_TARBALL" -o "$TMP/gnugo-3.8.tar.gz"
+GNUG0_TAR_SHA=$(sha256sum "$TMP/gnugo-3.8.tar.gz" | cut -d' ' -f1)
+rm -rf "$ENGINES/gnugo"
+tar -xzf "$TMP/gnugo-3.8.tar.gz" -C "$ENGINES"
+mv "$ENGINES/gnugo-3.8" "$ENGINES/gnugo"
+GNUG0_SHA="gnugo-3.8 tar sha256=$GNUG0_TAR_SHA"
+
+# 可执行文件 -> 静态库（GNU Go 用自己的大写 ADD_EXECUTABLE，不在下面那个小写 sed 的覆盖范围）
+sed_inplace 's/ADD_EXECUTABLE(gnugo/ADD_LIBRARY(gnugo STATIC/' "$ENGINES/gnugo/interface/CMakeLists.txt"
+grep -q 'ADD_LIBRARY(gnugo STATIC' "$ENGINES/gnugo/interface/CMakeLists.txt" \
+    || { log "ERROR: gnugo ADD_EXECUTABLE -> STATIC patch failed"; exit 1; }
+echo "gnugo source @ $ENGINES/gnugo ($GNUG0_SHA)"
+
 # ---------------------------------------------------------------------------
 # 2. Patch CMakeLists: add_executable -> add_library STATIC (Rapfi uses its
 #    own CMakeLists with bundled externals; Stockfish/Pikafish have none)
@@ -250,6 +268,7 @@ stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); NN
 pikafish:  https://github.com/official-pikafish/Pikafish $PF_SHA (GPL-3.0)
 pikafish_net_sha256: $(sha256sum "$ENGINES/pikafish/src/pikafish.nnue" 2>/dev/null | cut -d' ' -f1)
 rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0); built single-threaded (NO_MULTI_THREADING)
+gnugo:     https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz ($GNUG0_SHA) (GPL-3.0-or-later); driven via its C API, in-process
 bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams
 EOF
 

@@ -1,9 +1,10 @@
 THIRD PARTY LICENSES
 ====================
 
-Chuying Proxy Play（褚嬴代打）内置三个开源棋类引擎。自 2.0 起，三个引擎不再以独立
+Chuying Proxy Play（褚嬴代打）内置四个开源棋类引擎。自 2.0 起，引擎不再以独立
 可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、在游戏进程内运行**
-（stdin/stdout 被重定向到内存队列，不 spawn 任何 OS 进程）。
+（前三个引擎的 stdin/stdout 被重定向到内存队列；围棋引擎直接调用其 C API，
+连文本协议都不走），不 spawn 任何 OS 进程。
 
 1) Pikafish（中国象棋引擎）
    Source:  https://github.com/official-pikafish/Pikafish
@@ -31,16 +32,30 @@ Chuying Proxy Play（褚嬴代打）内置三个开源棋类引擎。自 2.0 起
    模型:    随附的 model210901.bin / mix9svqfreestyle_bsmix.bin.lz4 来自 Rapfi
             官方发布，遵循其仓库同样许可。
 
+4) GNU Go（围棋引擎）
+   Source:  https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz （GNU Go 3.8 稳定版；
+            官网 https://www.gnu.org/software/gnugo/）
+   License: GNU General Public License v3.0 or later（GPL-3.0-or-later，
+            源码头文件写明 "version 3 ... or (at your option) any later version"）
+   说明:    随 jar 分发的 chuying_gnugo 原生库链接 GNU Go 源码（interface/CMakeLists.txt
+            的 ADD_EXECUTABLE 在构建期改为 STATIC 库）。与另外三个引擎不同，围棋**不**
+            走 stdin/stdout 文本协议（GNU Go 用的是 C 的 FILE* 流，Windows/MinGW 没有
+            fopencookie/funopen 无法在进程内重定向），而是由桥接层直接调用其引擎 C API：
+            init_gnugo() -> 整盘覆写 board[]/board_ko_pos -> genmove()。
+            桥接层见 native/src/gnugo_bridge.cpp。
+   无权重:  GNU Go 是纯读取式引擎，不需要神经网络权重文件。
+
 ------------------------------------------------------------------------------
 GPL 合规说明（对应源码获取方式）
 
-上述三个引擎均为 GNU GPL-3.0，本 mod 本体同样以 GPL-3.0-only 发布
-（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
+上述四个引擎均为 GNU GPL（前三个 GPL-3.0，GNU Go 为 GPL-3.0-or-later），本 mod 本体
+同样以 GPL-3.0-only 发布（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
 
 GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
-  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库按固定 commit 拉取；
-  - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录三个引擎的仓库地址与
-    精确 commit hash（下载页的 Release 说明中同样列出）；
+  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库/官方 tar 包按固定
+    commit / 固定 sha256 拉取；
+  - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录四个引擎的仓库地址与
+    精确 commit hash / tar 包 sha256（下载页的 Release 说明中同样列出）；
   - 构建脚本 .github/scripts/build_native.sh 完整公开了源码所打的全部补丁，
     据此可复现出与本 mod 完全一致的引擎二进制。
 

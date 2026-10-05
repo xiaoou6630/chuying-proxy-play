@@ -1,10 +1,11 @@
-# 临时 POC：JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi）三平台编译。
-# 仅用于 poc/native-dll 分支验证「不 spawn OS 进程」路线；产物 90 天过期。
+# 临时 POC：JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi/gnugo）三平台编译。
+# poc/native-dll：不 spawn OS 进程路线的验证分支；go：围棋（GNU Go）接入分支。
+# 产物 90 天过期。
 name: native-build
 
 on:
   push:
-    branches: [poc/native-dll]
+    branches: [poc/native-dll, go]
   workflow_dispatch:
 
 permissions:
@@ -88,4 +89,11 @@ jobs:
         continue-on-error: true
         timeout-minutes: 4
         run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} rapfi
+        shell: bash
+
+      - name: JVM smoke test (gnugo)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 8
+        run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} gnugo
         shell: bash

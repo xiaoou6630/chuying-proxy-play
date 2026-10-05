@@ -21,7 +21,7 @@ esac
 cd "$ROOT/native/java-test"
 mkdir -p out
 echo "==> javac"
-javac -d out ../../src/main/java/com/chuying/engine/CChessNativeBridge.java ../../src/main/java/com/chuying/engine/WChessNativeBridge.java ../../src/main/java/com/chuying/engine/GomokuNativeBridge.java SmokeTest.java || exit 1
+javac -d out ../../src/main/java/com/chuying/engine/CChessNativeBridge.java ../../src/main/java/com/chuying/engine/WChessNativeBridge.java ../../src/main/java/com/chuying/engine/GomokuNativeBridge.java ../../src/main/java/com/chuying/engine/GoNativeBridge.java SmokeTest.java || exit 1
 
 # Pikafish loads pikafish.nnue at runtime and refuses to initialise without it, so
 # drop the net we downloaded for the build next to the test (the mod ships it in
@@ -53,4 +53,5 @@ run_engine() { # engine strict
 run_engine stockfish strict
 run_engine pikafish strict
 run_engine rapfi lenient
+run_engine gnugo strict
 echo "==> smoke tests done"
