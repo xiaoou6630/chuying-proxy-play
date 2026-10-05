@@ -21,12 +21,17 @@
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "切换代打开关",
+  "key.chuying.report": "举报一手",
   "hud.chuying.proxy_on": "褚嬴代打：已开启",
   "hud.chuying.proxy_off": "褚嬴代打：已关闭",
+  "hud.chuying.report": "举报一手！",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国象棋引擎库缺失或解压失败",
   "message.chuying.no_wchess_engine": "褚嬴代打：国际象棋引擎库缺失或解压失败",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五子棋引擎库缺失或解压失败",
   "message.chuying.no_shogi_engine": "褚嬴代打：将棋引擎初始化失败或 tlm_shogi 扩展缺失",
   "message.chuying.no_go_engine": "褚嬴代打：围棋引擎库缺失或解压失败",
-  "message.chuying.need_empty_hand": "褚嬴代打：请空手（棋盘需要空手操作）"
+  "message.chuying.need_empty_hand": "褚嬴代打：请空手（棋盘需要空手操作）",
+  "message.chuying.report_need_board": "褚嬴代打：对着围棋棋盘才能举报一手",
+  "message.chuying.report_not_maid_turn": "褚嬴代打：现在不是女仆的回合，举报无效",
+  "message.chuying.report_done": "褚嬴代打：举报成功，女仆被判停一手"
 }

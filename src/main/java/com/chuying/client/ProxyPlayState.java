@@ -20,6 +20,10 @@ public final class ProxyPlayState {
     public static volatile int lastGomokuCounter = -1;
     public static volatile int lastShogiCounter = -1;
     public static volatile int lastGoCounter = -1;
+    /** "举报一手" HUD 大字显示到什么时候（毫秒时间戳） */
+    public static volatile long reportFlashUntil = 0;
+    /** "举报一手" 冷却结束时间戳，防止连点刷屏 */
+    public static volatile long reportCooldownUntil = 0;
 
     private ProxyPlayState() {
     }

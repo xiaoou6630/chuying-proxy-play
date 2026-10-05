@@ -22,10 +22,12 @@ import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityGomoku;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityWChess;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
@@ -87,7 +89,16 @@ public class ProxyPlayClient {
 
     @SubscribeEvent
     public static void onKey(InputEvent.Key event) {
-        if (event.getAction() == GLFW.GLFW_PRESS && ProxyPlayKey.PROXY_KEY.matches(event.getKey(), event.getScanCode())) {
+        if (event.getAction() != GLFW.GLFW_PRESS) {
+            return;
+        }
+        // 举报一手（整活；只在装了 TouhouGO 且轮到女仆走子时真的生效）
+        if (ProxyPlayKey.REPORT_KEY.matches(event.getKey(), event.getScanCode())) {
+            ProxyPlayKey.REPORT_KEY.consumeClick();
+            reportOneMove(Minecraft.getInstance());
+            return;
+        }
+        if (ProxyPlayKey.PROXY_KEY.matches(event.getKey(), event.getScanCode())) {
             ProxyPlayKey.PROXY_KEY.consumeClick();
             ProxyPlayState.enabled = !ProxyPlayState.enabled;
             if (!ProxyPlayState.enabled) {
@@ -100,6 +111,65 @@ public class ProxyPlayClient {
                 mc.player.displayClientMessage(Component.translatable(
                         ProxyPlayState.enabled ? "hud.chuying.proxy_on" : "hud.chuying.proxy_off"), true);
             }
+        }
+    }
+
+    /**
+     * 举报一手（整活，和代打彼此独立）：对着围棋棋盘按 J，把女仆这一手判成"停一手"。
+     * <p>
+     * 视觉/听觉：屏幕中央闪一行大字 + 叮一声；功能上向服务端回一个负坐标的应手
+     * （模组自己的 {@code go_to_server} 通道），服务端只校验"是否女仆回合"，因此会执行
+     * {@code go.pass(WHITE)}。没对着棋盘 / 不是女仆回合时只表演，不产生任何影响。
+     */
+    private static void reportOneMove(Minecraft mc) {
+        long now = System.currentTimeMillis();
+        ProxyPlayState.reportFlashUntil = now + 2500;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.0F));
+        if (mc.player == null || mc.level == null) {
+            return;
+        }
+        if (now < ProxyPlayState.reportCooldownUntil) {
+            return; // 连点只表演，不重复发包
+        }
+        ProxyPlayState.reportCooldownUntil = now + 1500;
+
+        if (!(mc.hitResult instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        BlockPos pos = hit.getBlockPos();
+        Block block = mc.level.getBlockState(pos).getBlock();
+        if (!Config.GO_ENABLED.get() || !GoCompat.isGoBoard(block)) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        GomokuPart part = GoCompat.part(mc.level.getBlockState(pos));
+        if (part == null) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        BlockPos center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+        BlockEntity te = mc.level.getBlockEntity(center);
+        if (!GoCompat.isGoTile(te)) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        // 服务端只接受"轮到女仆（白）"的应手包；isPlayerTurn 为 true 说明该你走
+        if (GoCompat.isPlayerTurn(te)) {
+            reportNotice(mc, "message.chuying.report_not_maid_turn");
+            return;
+        }
+        if (GoCompat.judgeMaidPass(te, center)) {
+            Chuying.LOGGER.info("[chuying] report: 举报一手 -> 女仆被判停一手 @ {}", center);
+            reportNotice(mc, "message.chuying.report_done");
+        } else {
+            reportNotice(mc, "message.chuying.no_go_engine");
+        }
+    }
+
+    private static void reportNotice(Minecraft mc, String key) {
+        if (mc.player != null) {
+            mc.player.displayClientMessage(Component.translatable(key), true);
         }
     }
 

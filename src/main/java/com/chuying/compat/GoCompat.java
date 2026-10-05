@@ -7,15 +7,19 @@ import com.github.tartaricacid.touhoulittlemaid.block.BlockCChess;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockGomoku;
 import com.github.tartaricacid.touhoulittlemaid.block.BlockWChess;
 import com.github.tartaricacid.touhoulittlemaid.block.properties.GomokuPart;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -47,6 +51,9 @@ public final class GoCompat {
     private static final Map<String, Method> METHODS = new HashMap<>();
     /** 已确认不存在的方法（避免每次调用都重新探测并刷日志） */
     private static final java.util.Set<String> MISSING = new java.util.HashSet<>();
+    /** GoMovePayload(BlockPos, int, int) 的构造器（"举报一手"用） */
+    private static Constructor<?> maidPassCtor;
+    private static boolean maidPassProbed = false;
 
     private GoCompat() {
     }
@@ -249,5 +256,58 @@ public final class GoCompat {
     public static int lastY(BlockEntity te) {
         Object value = call(te, "getLastY", new Class<?>[0]);
         return value instanceof Integer i ? i : -1;
+    }
+
+    // ------------------------------------------------------------------
+    // "举报一手"（整活功能，独立于代打）
+    // ------------------------------------------------------------------
+
+    /**
+     * 反射找 TouhouGO 的 {@code network.GoMovePayload}：它的构造器是 {@code (BlockPos, int, int)}，
+     * 其中 x/y 为负表示"停一手"。包名不写死：从方块实体类名反推模组根包
+     * （{@code <root>.blockentity.TileEntityGo} -> {@code <root>.network.GoMovePayload}）。
+     */
+    private static Constructor<?> maidPassConstructor(BlockEntity te) {
+        if (maidPassProbed) {
+            return maidPassCtor;
+        }
+        maidPassProbed = true;
+        try {
+            String name = te.getClass().getName();
+            int cut = name.indexOf(".blockentity");
+            if (cut > 0) {
+                Class<?> payload = Class.forName(name.substring(0, cut) + ".network.GoMovePayload");
+                maidPassCtor = payload.getConstructor(BlockPos.class, int.class, int.class);
+            }
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying] 找不到 TouhouGO 的 GoMovePayload，举报一手不可用", t);
+        }
+        return maidPassCtor;
+    }
+
+    /**
+     * 举报一手：以"女仆的应手"为名义回一个负坐标，服务端会执行 {@code go.pass(WHITE)}，
+     * 即女仆被判停一手（服务端只校验"是否女仆回合"，不校验这是谁的决定）。
+     * <p>
+     * 注：这条走的是模组自己的 {@code go_to_server} 通道，和代打（原版右键模拟）是两条独立路线。
+     *
+     * @return 是否已把包发出去
+     */
+    public static boolean judgeMaidPass(BlockEntity te, BlockPos center) {
+        Constructor<?> ctor = maidPassConstructor(te);
+        if (ctor == null) {
+            return false;
+        }
+        try {
+            Object payload = ctor.newInstance(center, -1, -1);
+            if (!(payload instanceof CustomPacketPayload custom)) {
+                return false;
+            }
+            PacketDistributor.sendToServer(custom);
+            return true;
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying] 举报一手发送失败", t);
+            return false;
+        }
     }
 }

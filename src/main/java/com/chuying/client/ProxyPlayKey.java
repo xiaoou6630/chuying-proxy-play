@@ -24,8 +24,21 @@ public class ProxyPlayKey {
             GLFW.GLFW_KEY_K,
             "key.category.chuying");
 
+    /**
+     * 默认键位 J：举报一手（整活）—— 对着围棋棋盘按下去，把女仆这一手判成"停一手"。
+     * 只对装了 TouhouGO 的围棋棋盘生效，且必须轮到女仆走子。
+     */
+    public static final KeyMapping REPORT_KEY = new KeyMapping(
+            "key.chuying.report",
+            KeyConflictContext.IN_GAME,
+            KeyModifier.NONE,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_J,
+            "key.category.chuying");
+
     public static void registerKeyMapping(RegisterKeyMappingsEvent event) {
         event.register(PROXY_KEY);
+        event.register(REPORT_KEY);
     }
 
     public static void registerOverlay(RegisterGuiLayersEvent event) {
