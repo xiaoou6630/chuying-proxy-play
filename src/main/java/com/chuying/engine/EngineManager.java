@@ -19,6 +19,7 @@ public final class EngineManager {
     private static NativeUciEngine cchess;
     private static NativeUciEngine wchess;
     private static NativeGomokuEngine gomoku;
+    private static NativeGoEngine go;
 
     private EngineManager() {
     }
@@ -73,6 +74,18 @@ public final class EngineManager {
         return gomoku;
     }
 
+    /** 围棋（GNU Go，进程内，直调引擎 C API） */
+    public static synchronized NativeGoEngine go() {
+        if (go == null) {
+            String lib = EngineExtractor.nativeLibPath("chuying_gnugo");
+            if (lib == null) {
+                return null;
+            }
+            go = new NativeGoEngine(lib);
+        }
+        return go;
+    }
+
     public static synchronized void shutdown() {
         if (cchess != null) {
             cchess.close();
@@ -85,6 +98,10 @@ public final class EngineManager {
         if (gomoku != null) {
             gomoku.close();
             gomoku = null;
+        }
+        if (go != null) {
+            go.close();
+            go = null;
         }
     }
 }

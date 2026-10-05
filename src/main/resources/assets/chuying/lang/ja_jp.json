@@ -17,6 +17,7 @@
   "chuying.configuration.debugForceMaxMaid": "デバッグ：五目並べのメイドを最高難易度 HELL に強制",
   "chuying.configuration.shogiEnabled": "将棋代打（tlm_shogi 拡張が必要）",
   "chuying.configuration.pvpEnabled": "棋聖 PVP 代打（棋聖 ChessPVP が必要）",
+  "chuying.configuration.goEnabled": "囲碁代打（TouhouGO の碁盤が必要）",
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "代打の切り替え",
@@ -26,5 +27,6 @@
   "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_shogi_engine": "褚嬴代打：将棋エンジンの初期化に失敗、または tlm_shogi 拡張がありません",
+  "message.chuying.no_go_engine": "褚嬴代打：囲碁エンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.need_empty_hand": "褚嬴代打：手を空けてください（盤面は素手が必要）"
 }

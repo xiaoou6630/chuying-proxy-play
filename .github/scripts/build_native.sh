@@ -98,6 +98,18 @@ GNUG0_SHA="gnugo-3.8 tar sha256=$GNUG0_TAR_SHA"
 sed_inplace 's/ADD_EXECUTABLE(gnugo/ADD_LIBRARY(gnugo STATIC/' "$ENGINES/gnugo/interface/CMakeLists.txt"
 grep -q 'ADD_LIBRARY(gnugo STATIC' "$ENGINES/gnugo/interface/CMakeLists.txt" \
     || { log "ERROR: gnugo ADD_EXECUTABLE -> STATIC patch failed"; exit 1; }
+
+# CMake >= 3 禁止在 configure 期读取目标的 LOCATION 属性（CMP0026），而 GNU Go 3.8 正是
+# 用它取那几个"生成 pattern 源码"的小工具（mkpat/mkeyes/mkmcpat/joseki/uncompress_fuseki）
+# 的可执行文件路径。改成生成器表达式 $<TARGET_FILE:...>（ADD_CUSTOM_COMMAND 的 COMMAND
+# 支持生成器表达式），语义完全一致。
+sed_inplace -E \
+    's/GET_TARGET_PROPERTY\(([A-Za-z0-9_]+)[[:space:]]+([A-Za-z0-9_]+)[[:space:]]+LOCATION\)/SET(\1 $<TARGET_FILE:\2>)/' \
+    "$ENGINES/gnugo/patterns/CMakeLists.txt"
+if grep -q 'GET_TARGET_PROPERTY' "$ENGINES/gnugo/patterns/CMakeLists.txt"; then
+    log "ERROR: gnugo LOCATION(CMP0026) patch failed"
+    exit 1
+fi
 echo "gnugo source @ $ENGINES/gnugo ($GNUG0_SHA)"
 
 # ---------------------------------------------------------------------------

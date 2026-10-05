@@ -46,11 +46,12 @@ public final class EngineExtractor {
             "engines/shared/rapfi/model210901.bin",
             "engines/shared/rapfi/mix9svqfreestyle_bsmix.bin.lz4"
     );
-    /** 三个原生引擎库名（不含平台后缀） */
+    /** 四个原生引擎库名（不含平台后缀） */
     private static final List<String> NATIVE_LIBS = List.of(
             "chuying_stockfish",
             "chuying_pikafish",
-            "chuying_rapfi"
+            "chuying_rapfi",
+            "chuying_gnugo"
     );
     /** Rapfi config.toml 中需要改写为绝对路径的模型文件 */
     private static final List<String> RAPFI_MODEL_FILES = List.of(

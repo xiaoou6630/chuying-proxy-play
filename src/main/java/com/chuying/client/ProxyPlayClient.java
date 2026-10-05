@@ -3,9 +3,11 @@ package com.chuying.client;
 import com.chuying.Chuying;
 import com.chuying.Config;
 import com.chuying.compat.ChessPvpCompat;
+import com.chuying.compat.GoCompat;
 import com.chuying.compat.ShogiCompat;
 import com.chuying.engine.ChessConverters;
 import com.chuying.engine.EngineManager;
+import com.chuying.engine.NativeGoEngine;
 import com.chuying.engine.NativeGomokuEngine;
 import com.chuying.engine.NativeUciEngine;
 import com.github.tartaricacid.touhoulittlemaid.api.game.gomoku.Point;
@@ -158,6 +160,16 @@ public class ProxyPlayClient {
             GomokuPart part = state.getValue(BlockGomoku.PART);
             center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
             facing = state.getValue(BlockGomoku.FACING);
+        } else if (Config.GO_ENABLED.get() && GoCompat.isGoBoard(block)) {
+            // 围棋（TouhouGO）：九宫结构与五子棋一致，只是 PART/FACING 在它自己的类里
+            var state = mc.level.getBlockState(pos);
+            GomokuPart part = GoCompat.part(state);
+            if (part == null) {
+                return;
+            }
+            Direction goFacing = GoCompat.facing(state);
+            center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+            facing = goFacing != null ? goFacing : Direction.NORTH;
         }
         if (center == null || facing == null) {
             return;
@@ -171,6 +183,8 @@ public class ProxyPlayClient {
             tryWChess(mc, center, facing, w);
         } else if (te instanceof TileEntityGomoku g) {
             tryGomoku(mc, center, g);
+        } else if (Config.GO_ENABLED.get() && GoCompat.isGoTile(te)) {
+            tryGo(mc, center, te);
         }
     }
 
@@ -475,6 +489,98 @@ public class ProxyPlayClient {
                 ProxyPlayState.busy = false;
             }
         }, Util.backgroundExecutor());
+    }
+
+    /**
+     * 围棋（TouhouGO 车万女仆·围棋棋盘）代打。
+     * <p>
+     * <b>不碰 TouhouGO 的自定义协议</b>：落子依旧走原版右键模拟（{@link BoardClicker}），
+     * 女仆应手仍由模组自己的 {@code GoSyncPayload -> GoAI -> GoMovePayload} 流程计算；
+     * 本 mod 既不发送也不拦截它的 {@code go_to_client} / {@code go_to_server} 通道，
+     * 服务器也不需要安装本 mod。
+     * <p>
+     * 与其它棋种不同的是「整盘喂局面」：每手都把当前棋面 + 劫点注入引擎再 genmove，
+     * 所以不需要跟手、也不会因中途开关而算错局面。
+     */
+    private static void tryGo(Minecraft mc, BlockPos center, BlockEntity te) {
+        // 对局被重置/换新（手数回退）时清除局面去重，无需按 K 重启
+        int counter = GoCompat.moveCounter(te);
+        if (counter >= 0 && counter < ProxyPlayState.lastGoCounter) {
+            ProxyPlayState.lastFen = "";
+        }
+        if (counter >= 0) {
+            ProxyPlayState.lastGoCounter = counter;
+        }
+
+        if (!GoCompat.isPlayerTurn(te) || GoCompat.statue(te) != Statue.IN_PROGRESS) {
+            return;
+        }
+        byte[][] board = GoCompat.board(te);
+        if (board == null) {
+            return;
+        }
+        int koX = GoCompat.koX(te);
+        int koY = GoCompat.koY(te);
+        // 指纹：手数 + 最近一手 + 劫点（劫点变化也必须重新算）
+        String fp = "go" + counter + ":" + GoCompat.lastX(te) + "," + GoCompat.lastY(te) + ":" + koX + "," + koY;
+        if (fp.equals(ProxyPlayState.lastFen)) {
+            return;
+        }
+        NativeGoEngine engine = EngineManager.go();
+        if (engine == null) {
+            Chuying.LOGGER.warn("[chuying] go engine not available");
+            noticeNoEngine("message.chuying.no_go_engine");
+            return;
+        }
+        claimPosition(fp);
+        int level = NativeGoEngine.levelFor(Config.STRENGTH.get().multiplier);
+        Chuying.LOGGER.info("[chuying] go trigger counter={} ko=({},{}) level={} last=({},{})",
+                counter, koX, koY, level, GoCompat.lastX(te), GoCompat.lastY(te));
+        CompletableFuture.runAsync(() -> {
+            try {
+                int packed = engine.bestMove(board, koX, koY, level);
+                if (packed == NativeGoEngine.ERROR) {
+                    Chuying.LOGGER.warn("[chuying] go 引擎未给出着法");
+                    return;
+                }
+                mc.execute(() -> scheduleGoMove(center, packed, koX, koY, board));
+            } catch (Throwable t) {
+                Chuying.LOGGER.error("[chuying] go 代打异常", t);
+            } finally {
+                ProxyPlayState.busy = false;
+            }
+        }, Util.backgroundExecutor());
+    }
+
+    /** 围棋落子：{@link NativeGoEngine#PASS} 表示停一手（潜行 + 空手点击棋盘）。 */
+    private static void scheduleGoMove(BlockPos center, int packed, int koX, int koY, byte[][] board) {
+        Minecraft mc = Minecraft.getInstance();
+        if (packed == NativeGoEngine.PASS) {
+            Chuying.LOGGER.info("[chuying] go pass");
+            // 停一手：服务端判定的是 player.isShiftKeyDown()，必须先发潜行包再点棋盘
+            // （复用 PVP 代打那套潜行会话）。点 (7,7) 落在棋盘中央，不会误触"棋子盒重置"区。
+            PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 0, true));
+            return;
+        }
+        int x = packed / 100;
+        int y = packed % 100;
+        if (x < 0 || y < 0 || x >= GoCompat.SIZE || y >= GoCompat.SIZE || board[x][y] != 0) {
+            Chuying.LOGGER.warn("[chuying] go 非法着法 ({},{}), 跳过", x, y);
+            return;
+        }
+        if (x == koX && y == koY) {
+            // 引擎踩劫点：服务端（GoRules）会拒绝这一手，跳过等超时重算
+            Chuying.LOGGER.warn("[chuying] go 引擎给出劫点 ({},{}), 跳过", x, y);
+            return;
+        }
+        if (mc.player != null && mc.player.isShiftKeyDown()) {
+            // 玩家真的按着潜行：服务端会把这次点击当成"停一手"，先不落子，等玩家松手
+            Chuying.LOGGER.info("[chuying] go 玩家正按住潜行，暂不落子（避免被当成停一手）");
+            ProxyPlayState.lastFen = "";
+            return;
+        }
+        Chuying.LOGGER.info("[chuying] go move ({},{})", x, y);
+        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, x, y), 0, false));
     }
 
     /** 象棋"选子→落子"两步模拟点击，先点起点格，间隔数 tick 再点终点格；sneak 为 PVP 潜行标记 */

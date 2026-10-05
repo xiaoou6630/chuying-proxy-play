@@ -83,6 +83,18 @@ public final class BoardClicker {
     }
 
     /**
+     * 围棋（TouhouGO 车万女仆·围棋棋盘）：与五子棋**完全同一套换算**。
+     * <p>
+     * TouhouGO 的 {@code BlockGo.getChessPos / isClickChessBox} 与 TLM 1.21.1 的
+     * {@code BlockGomoku} 逐字节相同（9 组 part 偏移 + 0.1316 格距 + 0.07 命中区），
+     * 棋盘同样是 15x15 九宫多方块结构，因此直接复用 {@link #gomokuHit}。
+     * 已用穷举脚本核对：225 个交叉点 × 4 朝向全部解回原点，且不误触「棋子盒（重置）」区域。
+     */
+    public static BlockHitResult goHit(BlockPos center, int i, int j) {
+        return gomokuHit(center, i, j);
+    }
+
+    /**
      * 中象/国象：构造点击 (file, rank) 格的命中结果（file/rank 为相对棋盘原点的下标，0 起）。
      * <p>
      * 推导：TLM 服务端把命中点按 part 偏移后 yRot 旋转得到棋盘坐标系 clickPos，
