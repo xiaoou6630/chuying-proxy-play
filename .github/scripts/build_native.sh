@@ -199,17 +199,6 @@ patch_pos_guard countstones
 grep -c 'never abort the JVM on an invalid position' "$ENGINES/gnugo/engine/board.c" | grep -q '^3$' \
     || { log "ERROR: expected 3 position guards in board.c"; exit 1; }
 log "patched GNU Go latent bugs"
-
-# 临时诊断（仅 macOS，收尾会移除）：gnugo 只在 macOS/arm64 上断言中止，
-# 让 abortgo() 在 abort 前用 execinfo 打印原生调用栈，定位是谁传了垃圾值。
-if [ "$PLATFORM" = "macos" ]; then
-    PU="$ENGINES/gnugo/engine/printutils.c"
-    { echo '#include <execinfo.h>'; cat "$PU"; } > "$TMP/printutils.c"
-    mv "$TMP/printutils.c" "$PU"
-    perl -0pi -e 's/\n  abort\(\);  \/\* cause core dump \*\//\n  { void *bt_frames[48]; int bt_n = backtrace(bt_frames, 48); backtrace_symbols_fd(bt_frames, bt_n, 2); }\n  abort();/' "$PU"
-    grep -q 'backtrace_symbols_fd' "$PU" || { log "ERROR: printutils backtrace patch failed"; exit 1; }
-    log "patched abortgo() to print a backtrace (macos diagnostic)"
-fi
 echo "gnugo source @ $ENGINES/gnugo ($GNUG0_SHA)"
 
 # ---------------------------------------------------------------------------
