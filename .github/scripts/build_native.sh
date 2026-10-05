@@ -111,6 +111,95 @@ if grep -q 'GET_TARGET_PROPERTY' "$ENGINES/gnugo/patterns/CMakeLists.txt"; then
     exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# GNU Go 3.8 自身的三处老 C 缺陷（我们打的补丁；GPL-3.0-or-later，patch 脚本公开可复现）
+#   实测：只在 macOS/arm64 上必现 abort —— Linux 只是靠"未初始化内存恰好是 0"侥幸通过。
+#   用 CI 里的 execinfo 调用栈定位到：
+#     findstones(垃圾位置) <- get_aa_value/get_aa_status <- gg_sort <- atari_atari
+#   1) aa_init_moves() 只把 attacks[0].move 设成哨兵，target[] 其余槽位是未初始化栈内存，
+#      而 aa_sort_moves()/get_aa_value() 会把它们当"目标位置"使用。
+#   2) gg_sort()（自研 combsort）没有 nel < 2 的保护，nel == 0 时
+#      end = base + width * (nel - 1) 会 size_t 下溢。
+#   3) 防御：countstones/findstones/countlib 收到非法位置时返回 0，而不是 abortgo() 直接
+#      abort —— 原生 abort 会连同整个 Minecraft JVM 一起杀掉（进程内引擎必须优雅降级）。
+# awk 三平台都有；sed -i 的 GNU/BSD 差异太难缠。
+# ---------------------------------------------------------------------------
+awk_inplace() { # file awk-program
+    local f="$1" prog="$2" tmpf="$TMP/awk.$$"
+    awk "$prog" "$f" > "$tmpf" && mv "$tmpf" "$f"
+}
+
+log "patching GNU Go 3.8 latent bugs (aa_init_moves / gg_sort / position guards)"
+
+awk_inplace "$ENGINES/gnugo/engine/combination.c" '
+  /^aa_init_moves\(struct aa_move attacks\[AA_MAX_MOVES\]\)$/ { fn = 1 }
+  fn && /^\{$/ {
+    print "{"
+    print "  int k, r;"
+    print "  /* chuying: initialize the WHOLE array. upstream only sets attacks[0].move as"
+    print "     the sentinel, leaving target[] slots as uninitialized stack memory, which"
+    print "     aa_sort_moves()/get_aa_value() then treat as target positions. */"
+    print "  for (k = 0; k < AA_MAX_MOVES; k++) {"
+    print "    attacks[k].move = NO_MOVE;"
+    print "    for (r = 0; r < AA_MAX_TARGETS_PER_MOVE; r++)"
+    print "      attacks[k].target[r] = NO_MOVE;"
+    print "  }"
+    fn = 0; skip = 1; next
+  }
+  skip && /^  attacks\[0\]\.move = NO_MOVE;$/ { next }
+  skip && /^\}$/ { print; skip = 0; next }
+  { print }
+'
+grep -q 'initialize the WHOLE array' "$ENGINES/gnugo/engine/combination.c" \
+    || { log "ERROR: aa_init_moves patch failed"; exit 1; }
+
+awk_inplace "$ENGINES/gnugo/utils/gg_utils.c" '
+  /^gg_sort\(void \*base, size_t nel, size_t width,$/ { fn = 1 }
+  fn && /^\{$/ {
+    print "{"
+    print "  /* chuying: nel == 0 underflows the end pointer below (width * (nel - 1)). */"
+    print "  if (nel < 2)"
+    print "    return;"
+    fn = 0; next
+  }
+  { print }
+'
+grep -q 'if (nel < 2)' "$ENGINES/gnugo/utils/gg_utils.c" \
+    || { log "ERROR: gg_sort guard patch failed"; exit 1; }
+
+patch_pos_guard() { # funcname
+    awk_inplace "$ENGINES/gnugo/engine/board.c" "
+      /^$1\\(int str\\)\$/ { fn = 1 }
+      fn && /^\\{\$/ {
+        print \"{\"
+        print \"  /* chuying: never abort the JVM on an invalid position (in-process engine). */\"
+        print \"  if (!ON_BOARD1(str) || !IS_STONE(board[str]))\"
+        print \"    return 0;\"
+        fn = 0; next
+      }
+      { print }
+    "
+    grep -q 'never abort the JVM on an invalid position' "$ENGINES/gnugo/engine/board.c" \
+        || { log "ERROR: $1 guard patch failed"; exit 1; }
+}
+patch_pos_guard countlib
+# findstones 有额外的 maxstones/stones 参数，单独匹配
+awk_inplace "$ENGINES/gnugo/engine/board.c" '
+  /^findstones\(int str, int maxstones, int \*stones\)$/ { fn = 1 }
+  fn && /^\{$/ {
+    print "{"
+    print "  /* chuying: never abort the JVM on an invalid position (in-process engine). */"
+    print "  if (!ON_BOARD1(str) || !IS_STONE(board[str]))"
+    print "    return 0;"
+    fn = 0; next
+  }
+  { print }
+'
+patch_pos_guard countstones
+grep -c 'never abort the JVM on an invalid position' "$ENGINES/gnugo/engine/board.c" | grep -q '^3$' \
+    || { log "ERROR: expected 3 position guards in board.c"; exit 1; }
+log "patched GNU Go latent bugs"
+
 # 临时诊断（仅 macOS，收尾会移除）：gnugo 只在 macOS/arm64 上断言中止，
 # 让 abortgo() 在 abort 前用 execinfo 打印原生调用栈，定位是谁传了垃圾值。
 if [ "$PLATFORM" = "macos" ]; then
