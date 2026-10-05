@@ -27,6 +27,7 @@
   "hud.chuying.report": "举报一手！",
   "hud.chuying.report_hold": "举报一手… %s",
   "hud.chuying.report_armed": "举报已就绪：女仆下一手判停",
+  "hud.chuying.report_win_hold": "继续按住 = 必胜连招（重置 → 落子 → 双停判胜）",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国象棋引擎库缺失或解压失败",
   "message.chuying.no_wchess_engine": "褚嬴代打：国际象棋引擎库缺失或解压失败",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五子棋引擎库缺失或解压失败",
@@ -37,5 +38,6 @@
   "message.chuying.report_not_maid_turn": "褚嬴代打：现在不是女仆的回合，举报无效",
   "message.chuying.report_armed": "褚嬴代打：举报已就绪，女仆下一次应手会被判停一手",
   "message.chuying.report_done": "褚嬴代打：举报成功，女仆被判停一手",
-  "message.chuying.report_win": "褚嬴代打：举报成立，直接判我方获胜！"
+  "message.chuying.report_win": "褚嬴代打：举报成立，直接判我方获胜！",
+  "message.chuying.instant_win": "褚嬴代打：必胜连招已启动（重置 → 落子 → 双停判胜）"
 }

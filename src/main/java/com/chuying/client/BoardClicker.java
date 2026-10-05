@@ -95,6 +95,22 @@ public final class BoardClicker {
     }
 
     /**
+     * 围棋「棋子盒」命中：模组 {@code BlockGo.isClickChessBox} 只在两个对角 part 上判定，
+     * 且按朝向分两组（Z 轴：RIGHT_UP + LEFT_DOWN；X 轴：LEFT_UP + RIGHT_DOWN）。
+     * 取区域中心点，空手点下去就是「重置棋局」（源码 BlockGo.java:268-276，无条件）。
+     */
+    public static BlockHitResult goBowlHit(BlockPos center, Direction facing) {
+        boolean xAxis = facing != null && facing.getAxis() == Direction.Axis.X;
+        GomokuPart part = xAxis ? GomokuPart.LEFT_UP : GomokuPart.RIGHT_UP;
+        // 区域中心：Z 轴 RIGHT_UP = [0.5625,0.875]×[0.6875,1.0]；X 轴 LEFT_UP = [0.6875,1.0]×[0.125,0.4375]
+        double x = xAxis ? 0.84375 : 0.71875;
+        double z = xAxis ? 0.28125 : 0.84375;
+        BlockPos pos = center.offset(part.getPosX(), 0, part.getPosY());
+        Vec3 hit = Vec3.atBottomCenterOf(pos).add(x - 0.5, 0, z - 0.5);
+        return new BlockHitResult(hit, Direction.UP, pos, false);
+    }
+
+    /**
      * 中象/国象：构造点击 (file, rank) 格的命中结果（file/rank 为相对棋盘原点的下标，0 起）。
      * <p>
      * 推导：TLM 服务端把命中点按 part 偏移后 yRot 旋转得到棋盘坐标系 clickPos，

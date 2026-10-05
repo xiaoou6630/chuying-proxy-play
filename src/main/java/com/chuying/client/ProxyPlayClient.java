@@ -136,17 +136,64 @@ public class ProxyPlayClient {
             // 松开（或本来没按）：清掉长按状态，下次必须重新按满
             ProxyPlayState.reportHoldStart = 0;
             ProxyPlayState.reportHoldFired = false;
+            ProxyPlayState.reportWinFired = false;
             return;
         }
         if (ProxyPlayState.reportHoldStart == 0) {
             ProxyPlayState.reportHoldStart = now;
             ProxyPlayState.reportHoldFired = false;
+            ProxyPlayState.reportWinFired = false;
         }
-        if (!ProxyPlayState.reportHoldFired
-                && now - ProxyPlayState.reportHoldStart >= ProxyPlayState.REPORT_HOLD_MS) {
+        long held = now - ProxyPlayState.reportHoldStart;
+        if (!ProxyPlayState.reportHoldFired && held >= ProxyPlayState.REPORT_HOLD_MS) {
             ProxyPlayState.reportHoldFired = true;
             armReport(mc);
         }
+        // 继续按住：不抢时机、不用你手动点，模组自己完成「重置 → 落子 → 双停判胜」
+        if (!ProxyPlayState.reportWinFired && held >= ProxyPlayState.REPORT_WIN_HOLD_MS) {
+            ProxyPlayState.reportWinFired = true;
+            instantWin(mc);
+        }
+    }
+
+    /**
+     * 必胜连招（治"抢不到女仆回合"）：女仆应手是客户端算的、不到 1 tick 就轮回我方，
+     * 人手根本按不进那个窗口 —— 所以整套点击由我们自己发，天然没有抢时机问题：
+     * <ol>
+     *   <li>空手点棋子盒 → 服务端 {@code go.reset()}，白子清零；</li>
+     *   <li>天元落一子（黑 1、白 0）→ 紧接着把女仆这手判成停一手；</li>
+     *   <li>我方再停一手 → {@code passCount=2} → {@code endByScore()} → 数子黑 225 : 白 6.5 → 判我方胜。</li>
+     * </ol>
+     */
+    private static void instantWin(Minecraft mc) {
+        ProxyPlayState.reportArmed = false;
+        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 2000;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.4F));
+        if (mc.level == null || !(mc.hitResult instanceof BlockHitResult hit)
+                || hit.getType() != HitResult.Type.BLOCK) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        // 模组要求空手点棋盘（手上有东西会走 SKIP_DEFAULT_BLOCK_INTERACTION，什么都点不动）
+        if (mc.player != null && !mc.player.getMainHandItem().isEmpty()) {
+            reportNotice(mc, "message.chuying.need_empty_hand");
+            return;
+        }
+        BlockPos pos = hit.getBlockPos();
+        BlockEntity te = goTileAt(mc, pos);
+        GomokuPart part = GoCompat.part(mc.level.getBlockState(pos));
+        if (te == null || part == null) {
+            reportNotice(mc, "message.chuying.report_need_board");
+            return;
+        }
+        BlockPos center = pos.subtract(new Vec3i(part.getPosX(), 0, part.getPosY()));
+        Direction facing = GoCompat.facing(mc.level.getBlockState(pos));
+        // 1) 点棋子盒 → 重置（白子清零，数子立刻变成黑通吃）
+        PENDING_CLICKS.add(new PendingClick(BoardClicker.goBowlHit(center, facing), 0));
+        // 2) 隔 2 tick 落子；落完立刻判女仆停一手，并追加我方停一手（finishGame 路径）
+        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, false, center, true));
+        Chuying.LOGGER.info("[chuying] report: 必胜连招启动（重置 → 落子 → 双停判胜）@ {}", center);
+        reportNotice(mc, "message.chuying.instant_win");
     }
 
     /**
@@ -237,6 +284,8 @@ public class ProxyPlayClient {
         ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 3000;
         mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.2F));
         if (GoCompat.judgeMaidPass(te, center)) {
+            // 女仆被判停一手（passCount=1、回合回到我方）→ 我方也停一手 → passCount=2 → 数子终局
+            PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, true));
             Chuying.LOGGER.info("[chuying] go 收工：我方停一手 + 女仆停一手 -> 数子终局 @ {}", center);
             reportNotice(mc, "message.chuying.report_win");
         }

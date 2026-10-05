@@ -27,6 +27,7 @@
   "hud.chuying.report": "通報した！",
   "hud.chuying.report_hold": "通報まで %s",
   "hud.chuying.report_armed": "通報スタンバイ：メイドの次の一手はパス",
+  "hud.chuying.report_win_hold": "押し続けると必勝（リセット → 着手 → 双方パス）",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国将棋エンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンライブラリが見つからないか展開に失敗しました",
@@ -37,5 +38,6 @@
   "message.chuying.report_not_maid_turn": "褚嬴代打：メイドの手番ではないため通報は無効です",
   "message.chuying.report_armed": "褚嬴代打：通報スタンバイ、メイドの次の応手はパス扱いになります",
   "message.chuying.report_done": "褚嬴代打：通報成功、メイドはパスを宣告されました",
-  "message.chuying.report_win": "褚嬴代打：通報成立、あなたの勝ちです！"
+  "message.chuying.report_win": "褚嬴代打：通報成立、あなたの勝ちです！",
+  "message.chuying.instant_win": "褚嬴代打：必勝コンボ開始（リセット → 着手 → 双方パス）"
 }
