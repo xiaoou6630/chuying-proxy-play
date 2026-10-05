@@ -36,5 +36,6 @@
   "message.chuying.report_need_board": "褚嬴代打：碁盤に照準を合わせてください",
   "message.chuying.report_not_maid_turn": "褚嬴代打：メイドの手番ではないため通報は無効です",
   "message.chuying.report_armed": "褚嬴代打：通報スタンバイ、メイドの次の応手はパス扱いになります",
-  "message.chuying.report_done": "褚嬴代打：通報成功、メイドはパスを宣告されました"
+  "message.chuying.report_done": "褚嬴代打：通報成功、メイドはパスを宣告されました",
+  "message.chuying.report_win": "褚嬴代打：通報成立、あなたの勝ちです！"
 }

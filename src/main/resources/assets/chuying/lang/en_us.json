@@ -36,5 +36,6 @@
   "message.chuying.report_need_board": "Chuying: aim at a Go board to report a move",
   "message.chuying.report_not_maid_turn": "Chuying: not the maid's turn, report ignored",
   "message.chuying.report_armed": "Chuying: report armed - the maid's next reply will be judged a pass",
-  "message.chuying.report_done": "Chuying: reported - the maid is penalized with a pass"
+  "message.chuying.report_done": "Chuying: reported - the maid is penalized with a pass",
+  "message.chuying.report_win": "Chuying: report upheld - you win!"
 }

@@ -36,5 +36,6 @@
   "message.chuying.report_need_board": "褚嬴代打：对着围棋棋盘才能举报一手",
   "message.chuying.report_not_maid_turn": "褚嬴代打：现在不是女仆的回合，举报无效",
   "message.chuying.report_armed": "褚嬴代打：举报已就绪，女仆下一次应手会被判停一手",
-  "message.chuying.report_done": "褚嬴代打：举报成功，女仆被判停一手"
+  "message.chuying.report_done": "褚嬴代打：举报成功，女仆被判停一手",
+  "message.chuying.report_win": "褚嬴代打：举报成立，直接判我方获胜！"
 }

@@ -67,20 +67,27 @@ public class ProxyPlayClient {
         final boolean sneak;
         /** 围棋棋盘中心（非空表示这是代打发出的围棋落子；发完后若举报已挂起，立即抢判） */
         final BlockPos goCenter;
+        /** 围棋"收工"：这一手是停一手，发完立刻让女仆也停一手 → 双停 → 数子终局 */
+        final boolean finishGame;
 
         PendingClick(BlockHitResult hit, int delayTicks) {
-            this(hit, delayTicks, false, null);
+            this(hit, delayTicks, false, null, false);
         }
 
         PendingClick(BlockHitResult hit, int delayTicks, boolean sneak) {
-            this(hit, delayTicks, sneak, null);
+            this(hit, delayTicks, sneak, null, false);
         }
 
         PendingClick(BlockHitResult hit, int delayTicks, boolean sneak, BlockPos goCenter) {
+            this(hit, delayTicks, sneak, goCenter, false);
+        }
+
+        PendingClick(BlockHitResult hit, int delayTicks, boolean sneak, BlockPos goCenter, boolean finishGame) {
             this.hit = hit;
             this.delayTicks = delayTicks;
             this.sneak = sneak;
             this.goCenter = goCenter;
+            this.finishGame = finishGame;
         }
     }
 
@@ -203,12 +210,43 @@ public class ProxyPlayClient {
         ProxyPlayState.reportArmed = false;
         ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 2500;
         mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.0F));
+        byte[][] board = GoCompat.board(te);
+        Integer lead = board == null ? null : GoCompat.scoreLead(te, board);
         if (GoCompat.judgeMaidPass(te, center)) {
-            Chuying.LOGGER.info("[chuying] report: 举报成功 -> 女仆被判停一手 @ {} (force={})", center, force);
-            reportNotice(mc, "message.chuying.report_done");
+            if (lead != null && lead >= 1) {
+                // 举报＋判决：女仆这一手判停一手；回合回到我方后再停一手 → 双停 → 数子终局 → 判我方胜
+                PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 2, true));
+                Chuying.LOGGER.info("[chuying] report: 举报判胜（领先 {} 目）-> 女仆停一手 + 我方停一手 @ {}",
+                        lead, center);
+                reportNotice(mc, "message.chuying.report_win");
+            } else {
+                Chuying.LOGGER.info("[chuying] report: 举报成功 -> 女仆被判停一手 @ {} (force={}, 领先={})",
+                        center, force, lead);
+                reportNotice(mc, "message.chuying.report_done");
+            }
         } else {
             reportNotice(mc, "message.chuying.no_go_engine");
         }
+    }
+
+    /** 收工：我方那手"停一手"已经发出，这里紧接着把女仆的应手也判成停一手 → 双方连续停手 → 数子终局。 */
+    private static void finishGameByDoublePass(Minecraft mc, BlockPos center, BlockEntity te) {
+        if (center == null || te == null) {
+            return;
+        }
+        ProxyPlayState.reportFlashUntil = System.currentTimeMillis() + 3000;
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_BELL.value(), 1.2F));
+        if (GoCompat.judgeMaidPass(te, center)) {
+            Chuying.LOGGER.info("[chuying] go 收工：我方停一手 + 女仆停一手 -> 数子终局 @ {}", center);
+            reportNotice(mc, "message.chuying.report_win");
+        }
+    }
+
+    /** 兜底点是否可用：空位、非劫点、且按模组规则合法（禁自杀）。 */
+    private static boolean usableGoPoint(BlockEntity te, byte[][] board, int x, int y, int koX, int koY) {
+        return x >= 0 && y >= 0 && x < GoCompat.SIZE && y < GoCompat.SIZE
+                && board[x][y] == 0 && !(x == koX && y == koY)
+                && GoCompat.isLegal(te, board, x, y, koX, koY);
     }
 
     /** 准星所指方块若是围棋棋盘，返回其中心方块实体（九宫反推），否则 null。 */
@@ -345,7 +383,13 @@ public class ProxyPlayClient {
                 }
                 BoardClicker.sendUseItemOn(pc.hit);
                 it.remove();
-                if (pc.goCenter != null && ProxyPlayState.reportArmed) {
+                if (pc.goCenter != null && pc.finishGame) {
+                    // 收工：我方这手"停一手"已发出，服务端处理完就轮到女仆 →
+                    // 紧接着把她的应手也判成停一手 → 双方连续停手 → 数子终局（我方领先则胜）
+                    BlockEntity te = Minecraft.getInstance().level == null ? null
+                            : Minecraft.getInstance().level.getBlockEntity(pc.goCenter);
+                    finishGameByDoublePass(Minecraft.getInstance(), pc.goCenter, te);
+                } else if (pc.goCenter != null && ProxyPlayState.reportArmed) {
                     // 围棋落子刚发出去：同一个连接按顺序到达，服务端处理完这一手就轮到女仆，
                     // 紧跟其后的"判停包"正好落在女仆回合里（确定性抢先，不靠 tick 碰运气）。
                     BlockEntity te = Minecraft.getInstance().level == null ? null
@@ -698,8 +742,6 @@ public class ProxyPlayClient {
                                        net.minecraft.world.level.block.entity.BlockEntity te) {
         Minecraft mc = Minecraft.getInstance();
         if (packed == NativeGoEngine.PASS) {
-            // 反"停手送分"兜底：实测一局 237 手里 GNU Go 停了 82 手（对手永远不会主动停手，
-            // 它一停就等于白送）。棋盘上还有明显空的点时不接受停手，改用模组自带 GoAI 顶一手。
             int empty = 0;
             for (int i = 0; i < GoCompat.SIZE; i++) {
                 for (int j = 0; j < GoCompat.SIZE; j++) {
@@ -708,20 +750,47 @@ public class ProxyPlayClient {
                     }
                 }
             }
+            Integer lead = GoCompat.scoreLead(te, board);
+            if (lead != null && lead >= 1) {
+                // 已经赢定了：**收工**（我方停一手 + 立刻让女仆也停一手 → 双停 → 数子终局 → 判我方胜）。
+                // 之前这里会一直用兜底着法硬下，实测从"空点 52"一路鞭尸到 398 手才发现已经在赢。
+                Chuying.LOGGER.info("[chuying] go 引擎想停手、我方领先 {} 目（空点 {}）-> 收工判胜", lead, empty);
+                PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 0, true, center, true));
+                return;
+            }
+            // 反"停手送分"兜底：引擎想停但还没赢，改用模组自带 GoAI 顶一手；
+            // 并且必须先用模组规则校验合法性（之前没校验，自杀手被服务端拒 → 卡住每 10 秒重试）。
             if (empty >= 10) {
+                int bx = -1;
+                int by = -1;
                 Integer fallback = GoCompat.fallbackMove(te, board, koX, koY);
                 if (fallback != null) {
                     int fx = fallback / 100;
                     int fy = fallback % 100;
-                    if (fx >= 0 && fy >= 0 && fx < GoCompat.SIZE && fy < GoCompat.SIZE
-                            && board[fx][fy] == 0 && !(fx == koX && fy == koY)) {
-                        Chuying.LOGGER.info("[chuying] go 引擎想停手（空点 {}），改用兜底着法 ({},{})", empty, fx, fy);
-                        PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, fx, fy), 0, false, center));
-                        return;
+                    if (usableGoPoint(te, board, fx, fy, koX, koY)) {
+                        bx = fx;
+                        by = fy;
                     }
                 }
+                if (bx < 0) {
+                    for (int i = 0; i < GoCompat.SIZE && bx < 0; i++) {
+                        for (int j = 0; j < GoCompat.SIZE; j++) {
+                            if (usableGoPoint(te, board, i, j, koX, koY)) {
+                                bx = i;
+                                by = j;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (bx >= 0) {
+                    Chuying.LOGGER.info("[chuying] go 引擎想停手（空点 {}，领先 {}）-> 兜底着法 ({},{})",
+                            empty, lead, bx, by);
+                    PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, bx, by), 0, false, center));
+                    return;
+                }
             }
-            Chuying.LOGGER.info("[chuying] go pass (空点 {})", empty);
+            Chuying.LOGGER.info("[chuying] go pass (空点 {}，领先 {})", empty, lead);
             // 停一手：服务端判定的是 player.isShiftKeyDown()，必须先发潜行包再点棋盘
             // （复用 PVP 代打那套潜行会话）。点 (7,7) 落在棋盘中央，不会误触"棋子盒重置"区。
             PENDING_CLICKS.add(new PendingClick(BoardClicker.goHit(center, 7, 7), 0, true));

@@ -317,7 +317,22 @@ public final class GoCompat {
     // ------------------------------------------------------------------
 
     private static Method chooseMoveMethod;
+    private static Method scoreMethod;
+    private static Method tryPlayMethod;
     private static boolean chooseMoveProbed = false;
+
+    private static Class<?> gameClass(BlockEntity te, String simple) {
+        String name = te.getClass().getName();
+        int cut = name.indexOf(".blockentity");
+        if (cut <= 0) {
+            return null;
+        }
+        try {
+            return Class.forName(name.substring(0, cut) + ".game." + simple);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
 
     private static Method chooseMove(BlockEntity te) {
         if (chooseMoveProbed) {
@@ -325,10 +340,8 @@ public final class GoCompat {
         }
         chooseMoveProbed = true;
         try {
-            String name = te.getClass().getName();
-            int cut = name.indexOf(".blockentity");
-            if (cut > 0) {
-                Class<?> ai = Class.forName(name.substring(0, cut) + ".game.GoAI");
+            Class<?> ai = gameClass(te, "GoAI");
+            if (ai != null) {
                 chooseMoveMethod = ai.getMethod("chooseMove", byte[][].class, byte.class,
                         int.class, int.class, int.class, java.util.Random.class);
             }
@@ -359,6 +372,65 @@ public final class GoCompat {
             int x = (Integer) gx.invoke(point);
             int y = (Integer) gy.invoke(point);
             return (x < 0 || y < 0) ? null : x * 100 + y;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * 用模组自己的规则校验一手棋是否合法（禁着点/自杀/劫都会拒绝）。
+     * 必须喂副本：{@code GoRules.tryPlay} 会改动棋盘。
+     *
+     * @return 合法返回 true；反射失败时返回 true（不拦，交给服务端判）
+     */
+    public static boolean isLegal(BlockEntity te, byte[][] board, int x, int y, int koX, int koY) {
+        if (board == null) {
+            return false;
+        }
+        try {
+            if (tryPlayMethod == null) {
+                Class<?> rules = gameClass(te, "GoRules");
+                if (rules == null) {
+                    return true;
+                }
+                tryPlayMethod = rules.getMethod("tryPlay", byte[][].class, int.class, int.class,
+                        byte.class, int.class, int.class);
+            }
+            byte[][] work = new byte[board.length][];
+            for (int i = 0; i < board.length; i++) {
+                work[i] = board[i].clone();
+            }
+            Object result = tryPlayMethod.invoke(null, work, x, y, (byte) 1, koX, koY);
+            Method illegal = result.getClass().getMethod("illegal");
+            return !(Boolean) illegal.invoke(result);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * 按模组的数子规则估分：黑方（子 + 围空）减白方（子 + 围空 + 6.5 贴目）。
+     *
+     * @return 领先目数；反射失败返回 null
+     */
+    public static Integer scoreLead(BlockEntity te, byte[][] board) {
+        if (board == null) {
+            return null;
+        }
+        try {
+            if (scoreMethod == null) {
+                Class<?> rules = gameClass(te, "GoRules");
+                if (rules == null) {
+                    return null;
+                }
+                scoreMethod = rules.getMethod("score", byte[][].class);
+            }
+            Object score = scoreMethod.invoke(null, (Object) board);
+            Method black = score.getClass().getMethod("black");
+            Method white = score.getClass().getMethod("white");
+            int b = (Integer) black.invoke(score);
+            double w = (Double) white.invoke(score);
+            return (int) Math.round(b - w);
         } catch (Throwable t) {
             return null;
         }
