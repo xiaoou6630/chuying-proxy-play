@@ -19,8 +19,25 @@
 
 #include <mutex>
 
+// 注意：GNU Go 3.8 的 gnugo.h **不能**直接喂给 C++ —— 它在第 346 行就
+// "enum dragon_status crude_status(int pos);" 这样使用未先声明的枚举（C 里只是
+// 警告，C++ 是硬错误）。因此这里只包含它 C++ 干净的 board.h（boards/坐标/劫点等），
+// 其余入口自己声明；下面的原型与 GNU Go 3.8 的 gnugo.h / clock.h / globals.c 一一对应。
 extern "C" {
-#include "gnugo.h"   // GNU Go 公共 API（内含 board.h / clock.h / sgftree.h 的声明与常量）
+#include "board.h"   // POS/I/J、board[]、board_size、board_ko_pos、komi、EMPTY/WHITE/BLACK、PASS_MOVE
+
+void init_gnugo(float memory, unsigned int random_seed);   // engine/interface.c
+void gnugo_clear_board(int boardsize);                     // engine/interface.c
+int genmove(int color, float *value, int *resign);         // engine/genmove.c
+void set_level(int new_level);                             // engine/clock.c（声明于 clock.h）
+
+extern int chinese_rules;    // engine/globals.c：数子
+extern int resign_allowed;   // engine/globals.c：是否允许认输
+extern int quiet;            // engine/globals.c：安静模式
+extern int verbose;          // engine/globals.c
+extern int debug;            // engine/globals.c
+extern int showtime;         // engine/globals.c
+extern int showscore;        // engine/globals.c
 }
 
 namespace {
