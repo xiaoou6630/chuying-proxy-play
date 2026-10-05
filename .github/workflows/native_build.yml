@@ -128,5 +128,5 @@ jobs:
             ../../src/main/java/com/chuying/engine/GoNativeBridge.java \
             SmokeTest.java
           ls -la ../build/chuying_gnugo.dylib || true
-          lldb -b -o run -o "bt 45" -o quit -- java -cp out SmokeTest gnugo "$PWD/../build/chuying_gnugo.dylib" 2>&1 | tail -130
+          lldb -b -o run -o "bt all" -o quit -- java -cp out SmokeTest gnugo "$PWD/../build/chuying_gnugo.dylib" 2>&1 | tail -200
         shell: bash
