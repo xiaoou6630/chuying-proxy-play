@@ -135,18 +135,24 @@ chuying_bridge(chuying_rapfi
 # ---------------------------------------------------------------------------
 set(CHUYING_GNUG0_DIR ${CMAKE_CURRENT_SOURCE_DIR}/engines/gnugo)
 if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
-    # GNU Go 3.8 是 2009 年的 C89 代码：隐式函数声明 / 隐式整数转换在 GCC 14、
-    # Clang 16 起是硬错误，这里统一降级并把语言标准固定为 gnu90。
+    # GNU Go 3.8 是 2009 年的 C89 代码：
+    #   * -fcommon：GCC 10 / Clang 11 起默认 -fno-common，它的暂定定义
+    #     （meaningless_white_moves 等）会变成"重复定义"直接链接失败；
+    #   * 隐式函数声明 / 隐式整数转换在 GCC 14、Clang 16 起是硬错误，统一降级；
+    #   * 语言标准固定为 gnu90（它的代码就是这个年代的）。
+    # 这些开关只作用于 C（避免 C++ 桥收到无意义的编译告警）。
     set(CMAKE_C_STANDARD 90)
     set(CMAKE_C_STANDARD_REQUIRED OFF)
     if(NOT MSVC)
-        add_compile_options(-Wno-implicit-function-declaration
-                            -Wno-int-conversion
-                            -Wno-implicit-int
-                            -Wno-builtin-declaration-mismatch
-                            -Wno-return-type)
+        add_compile_options(
+            "$<$<COMPILE_LANGUAGE:C>:-fcommon>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-implicit-function-declaration>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-int-conversion>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-implicit-int>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-builtin-declaration-mismatch>"
+            "$<$<COMPILE_LANGUAGE:C>:-Wno-return-type>")
         if(NOT WIN32)
-            add_compile_options(-D_GNU_SOURCE)
+            add_compile_options("$<$<COMPILE_LANGUAGE:C>:-D_GNU_SOURCE>")
         endif()
     endif()
 
