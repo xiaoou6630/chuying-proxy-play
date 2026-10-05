@@ -20,6 +20,12 @@ public final class ProxyPlayState {
     public static volatile int lastGomokuCounter = -1;
     public static volatile int lastShogiCounter = -1;
     public static volatile int lastGoCounter = -1;
+    /** "举报一手" 需要长按的时间（毫秒）：按住 J 到进度条走满才触发，松开即取消 */
+    public static final long REPORT_HOLD_MS = 1500;
+    /** "举报一手" 长按开始的时间戳（0 = 没按住） */
+    public static volatile long reportHoldStart = 0;
+    /** 本次长按是否已触发过（按住不放不会连续触发，需松开重按） */
+    public static volatile boolean reportHoldFired = false;
     /** "举报一手" HUD 大字显示到什么时候（毫秒时间戳） */
     public static volatile long reportFlashUntil = 0;
     /** "举报一手" 冷却结束时间戳，防止连点刷屏 */

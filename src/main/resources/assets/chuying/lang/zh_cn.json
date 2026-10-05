@@ -21,10 +21,11 @@
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "切换代打开关",
-  "key.chuying.report": "举报一手",
+  "key.chuying.report": "举报一手（长按）",
   "hud.chuying.proxy_on": "褚嬴代打：已开启",
   "hud.chuying.proxy_off": "褚嬴代打：已关闭",
   "hud.chuying.report": "举报一手！",
+  "hud.chuying.report_hold": "举报一手… %s",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国象棋引擎库缺失或解压失败",
   "message.chuying.no_wchess_engine": "褚嬴代打：国际象棋引擎库缺失或解压失败",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五子棋引擎库缺失或解压失败",

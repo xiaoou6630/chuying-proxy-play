@@ -92,12 +92,8 @@ public class ProxyPlayClient {
         if (event.getAction() != GLFW.GLFW_PRESS) {
             return;
         }
-        // 举报一手（整活；只在装了 TouhouGO 且轮到女仆走子时真的生效）
-        if (ProxyPlayKey.REPORT_KEY.matches(event.getKey(), event.getScanCode())) {
-            ProxyPlayKey.REPORT_KEY.consumeClick();
-            reportOneMove(Minecraft.getInstance());
-            return;
-        }
+        // 注：举报一手改成"长按 J 到进度条走满"，在 onClientTick 里轮询按键状态
+        //（KeyMapping 的按下事件会带按键重复，用事件做长按计时不可靠）
         if (ProxyPlayKey.PROXY_KEY.matches(event.getKey(), event.getScanCode())) {
             ProxyPlayKey.PROXY_KEY.consumeClick();
             ProxyPlayState.enabled = !ProxyPlayState.enabled;
@@ -111,6 +107,31 @@ public class ProxyPlayClient {
                 mc.player.displayClientMessage(Component.translatable(
                         ProxyPlayState.enabled ? "hud.chuying.proxy_on" : "hud.chuying.proxy_off"), true);
             }
+        }
+    }
+
+    /**
+     * 举报一手：按住 J 累计到 {@link ProxyPlayState#REPORT_HOLD_MS} 才触发，松开即取消。
+     * HUD 上的进度条与倒计时由 {@link ProxyPlayOverlay} 画。
+     */
+    private static void tickReportKey() {
+        Minecraft mc = Minecraft.getInstance();
+        boolean holding = ProxyPlayKey.REPORT_KEY.isDown() && mc.screen == null && mc.player != null;
+        long now = System.currentTimeMillis();
+        if (!holding) {
+            // 松开（或本来没按）：清掉长按状态，下次必须重新按满
+            ProxyPlayState.reportHoldStart = 0;
+            ProxyPlayState.reportHoldFired = false;
+            return;
+        }
+        if (ProxyPlayState.reportHoldStart == 0) {
+            ProxyPlayState.reportHoldStart = now;
+            ProxyPlayState.reportHoldFired = false;
+        }
+        if (!ProxyPlayState.reportHoldFired
+                && now - ProxyPlayState.reportHoldStart >= ProxyPlayState.REPORT_HOLD_MS) {
+            ProxyPlayState.reportHoldFired = true;
+            reportOneMove(mc);
         }
     }
 
@@ -177,6 +198,8 @@ public class ProxyPlayClient {
     public static void onClientTick(ClientTickEvent.Post event) {
         // 优先执行排队的模拟点击（象棋两步间隔）
         processPendingClicks();
+        // 举报一手：长按计时（与代打开关无关）
+        tickReportKey();
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) {

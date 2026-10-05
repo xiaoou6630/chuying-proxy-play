@@ -21,10 +21,11 @@
 
   "key.category.chuying": "褚嬴代打",
   "key.chuying.proxy_play": "代打の切り替え",
-  "key.chuying.report": "一手を通報",
+  "key.chuying.report": "一手を通報（長押し）",
   "hud.chuying.proxy_on": "褚嬴代打：ON",
   "hud.chuying.proxy_off": "褚嬴代打：OFF",
   "hud.chuying.report": "通報した！",
+  "hud.chuying.report_hold": "通報まで %s",
   "message.chuying.no_cchess_engine": "褚嬴代打：中国将棋エンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_wchess_engine": "褚嬴代打：チェスエンジンライブラリが見つからないか展開に失敗しました",
   "message.chuying.no_gomoku_engine": "褚嬴代打：五目並べエンジンライブラリが見つからないか展開に失敗しました",

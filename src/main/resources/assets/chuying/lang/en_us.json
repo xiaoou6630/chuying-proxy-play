@@ -21,10 +21,11 @@
 
   "key.category.chuying": "Chuying Proxy Play",
   "key.chuying.proxy_play": "Toggle Proxy Play",
-  "key.chuying.report": "Report a move",
+  "key.chuying.report": "Report a move (hold)",
   "hud.chuying.proxy_on": "Chuying Proxy Play: ON",
   "hud.chuying.proxy_off": "Chuying Proxy Play: OFF",
   "hud.chuying.report": "REPORTED!",
+  "hud.chuying.report_hold": "Reporting... %s",
   "message.chuying.no_cchess_engine": "Chuying: Chinese Chess engine library missing or extraction failed",
   "message.chuying.no_wchess_engine": "Chuying: Western Chess engine library missing or extraction failed",
   "message.chuying.no_gomoku_engine": "Chuying: Gomoku engine library missing or extraction failed",
