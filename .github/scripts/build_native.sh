@@ -309,7 +309,12 @@ for f in engine/reading.c engine/oracle.c; do
 done
 
 # 兜底校验：参与编译的引擎源码里不允许再有任何裸 abort();
-remaining=$(grep -rE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' | wc -l)
+# ⚠️ 注意 set -euo pipefail：grep 无匹配时返回 1，pipefail 会让整个管道返回 1，
+# set -e 直接把脚本干掉（实测踩过：这里「校验通过」反而让构建在 22 秒时静默退出，
+# 后面 cmake 根本没跑，四个引擎全部 UnsatisfiedLinkError）。
+# 因此必须用 `|| true` 兜住 grep 的非零退出码，只信 wc -l 的结果。
+remaining=$( { grep -rE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
+remaining=$((remaining + 0))
 if [ "$remaining" -ne 0 ]; then
     log "ERROR: $remaining bare abort() call(s) remain in gnugo/engine"
     grep -rnE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true
