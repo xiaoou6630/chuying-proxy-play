@@ -60,3 +60,9 @@ native/java-test/out/
 native/java-test/pikafish.nnue
 
 native_artifacts/
+
+# 本地测试探针与临时权重（不提交）
+native/java-test/*Probe*.java
+native/java-test/stockfish/
+native/java-test/out/
+native/java-test/*.nnue
