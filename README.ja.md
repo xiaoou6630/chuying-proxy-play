@@ -24,7 +24,7 @@
 | **ワンキー代打** | **K** キーでON/OFF。キー設定はゲーム内で変更可能 |
 | **思考強度4段階** | 低 / 標準 / 高 / 極限 —— ゲーム内でリアルタイム調整、次の一手から即反映 |
 | **引き分け回避（チェス）** | Stockfish に勝利を狙わせ、強制ドローを回避 |
-| **エンジン自動展開** | **Windows / Linux / macOS（Intel Mac 含む）対応の jar は 1 つだけ**。現在の OS 用の分だけを展開 |
+| **エンジン自動展開** | Windows / Linux / macOS 用ネイティブライブラリを同梱、初回起動時に `config/chuying/engines/` へ展開 |
 | **将棋（しょうぎ）対応** | [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) アドオン導入時は将棋も代打（同梱の Sunfish を使用、サイズ増加なし） |
 | **棋聖 PVP 対応** | [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) アドオン導入時は PVP も代打：自分の担当側のみを打つ（同アドオンのスニーククリック操作が必要） |
 | **囲碁対応** | [TouhouGO](https://github.com/moyinsky/TouhouGO) 導入時は 15路・数え子の囲碁も代打。[GNU Go](https://www.gnu.org/software/gnugo/) が**プロセス内**で動作 |
@@ -42,17 +42,15 @@
 | 将棋 | `tlm_shogi` 同梱の Sunfish | リフレクション | 本 MOD には非同梱、アドオン導入時のみ有効 |
 | 囲碁 | [GNU Go](https://www.gnu.org/software/gnugo/) 3.8 | エンジン C API を直接呼び出し（プロセス内） | jar に同梱。盤面は TouhouGO 由来 |
 
-## すべての OS で 1 つの jar
+## 3プラットフォーム配布
 
-**3.0 以降、OS 別の配布はありません** — jar は 1 つだけです：
+1回のビルドで3種類の jar を生成。お使いのOSに合ったものを選んでください（**間違えないように**）：
 
 | ファイル | 対応OS |
 |---|---|
-| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-universal.jar` | Windows x64 / Linux x64 / macOS（Apple Silicon **と** Intel Mac の両方） |
-
-> 3.0 より前は 3 つの jar がそれぞれエンジンを同梱していました（合計 1219 MB）。
-> 現在は 1 つに統合し、Stockfish の NNUE 重みもバイナリに埋め込まず 3 プラットフォームで
-> 共有するため、合計約 129 MB になります。
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-linux.jar` | Linux（x86-64, AVX2） |
+| `Chuying.Proxy.Play<バージョン>-NeoForge-1.21.1-macos.jar` | macOS（Apple Silicon） |
 
 > エンジンは初回起動時に `config/chuying/engines/` へ自動展開されます。手動設定は不要です。
 

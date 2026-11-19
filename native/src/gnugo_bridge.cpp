@@ -18,7 +18,6 @@
 #include <jni.h>
 
 #include <mutex>
-#include <csetjmp>
 
 // 注意：GNU Go 3.8 的 gnugo.h **不能**直接喂给 C++ —— 它在第 346 行就
 // "enum dragon_status crude_status(int pos);" 这样使用未先声明的枚举（C 里只是
@@ -42,58 +41,6 @@ extern int showscore;        // engine/globals.c
 extern int capture_all_dead;   // engine/globals.c：追吃对方死子
 extern int play_out_aftermath; // engine/globals.c：把局面彻底走净（不许闲着）
 extern int movenum;            // board.h：手数（GNU Go 内部判断棋局阶段）
-
-// ---- abortgo 的 longjmp 逃生通道 ----------------------------------------
-// GNU Go 3.8 里所有内部一致性检查失败都会走 abortgo() -> abort()，那会**直接杀掉
-// 整个 JVM**（进程内引擎不能这么做）。实测崩溃点：
-//   gnugo/engine/board.c:3042  ASSERT_ON_BOARD1(pos) near PASS
-// 即它把 PASS 哨兵(-1) 当坐标传进了 is_ko() 一类的函数，棋盘接近下满（第 224 手、
-// 只剩 6 个空点）时必现。
-//
-// 处理办法：CI 构建时把 printutils.c 的 `abort()` 换成本文件的 chuying_gnugo_abortgo_exit()
-// （见 .github/scripts/build_native.sh），它 longjmp 回 nativeGenmove 的 setjmp 点，
-// 于是「引擎内部踩 bug」退化成「这一手算不出来」，返回 -3 给 Java 层跳过即可。
-void chuying_gnugo_abortgo_exit(void);
-}
-
-// 当前正在执行的引擎调用是否处于 setjmp 保护区；jmp_buf 由 bridge 自己持有
-namespace {
-jmp_buf g_jmp;            // genmove / setPosition 的保护区
-bool g_jmp_active = false;
-jmp_buf g_jmp_boot;       // init_gnugo / clear_board 的保护区
-bool g_jmp_boot_active = false;
-}
-
-// 必须 extern "C"：调用方 printutils.c 是 C 文件（CI 会把 abortgo() 的 abort()
-// 换成这个函数），C++ 名字修饰会让链接找不到符号。
-//
-// __attribute__((weak)) 是必须的：GNU Go 里有几个**构建期小工具**
-// （patterns/joseki、patterns/uncompress_fuseki）也链接 libboard.a / libutils.a，
-// 但它们不是 chuying_gnugo 共享库、拿不到本符号，链接时报：
-//   printutils.c:(.text+0x10ed): undefined reference to `chuying_gnugo_abortgo_exit'
-//   gmake[2]: *** [gnugo_build/patterns/CMakeFiles/joseki.dir/...] Error 1
-// 这些工具只在编译期生成定式数据库，运行时用不到。声明为 weak 后它们链接时
-// 该符号解析为 0；只要运行时不真的调用就没有问题（运行时走的是 chuying_gnugo，
-// 那里符号是强定义）。
-#if defined(_MSC_VER)
-#define CHUYING_ABORT_HOOK
-#else
-#define CHUYING_ABORT_HOOK __attribute__((weak))
-#endif
-
-extern "C" CHUYING_ABORT_HOOK void chuying_gnugo_abortgo_exit(void) {
-    if (g_jmp_active) {
-        g_jmp_active = false;
-        longjmp(g_jmp, 1);
-    }
-    // 没有保护区（init_gnugo / clear_board 期间）：既不能 abort（会杀 JVM），
-    // 也不能 throw（从 C 栈帧穿过未定义行为）。这里 longjmp 到 init 的保护区；
-    // 若 init 也没设保护区，就只能是启动期，直接返回让调用方继续（此时
-    // GNU Go 的全局状态未建立，后续 nativeGenmove 会因 g_inited 检查而失败）。
-    if (g_jmp_boot_active) {
-        g_jmp_boot_active = false;
-        longjmp(g_jmp_boot, 1);
-    }
 }
 
 namespace {
@@ -127,15 +74,6 @@ Java_com_chuying_engine_GoNativeBridge_nativeInit(JNIEnv*, jobject, jint cacheMb
     if (cacheMb > 256) {
         cacheMb = 256;
     }
-
-    // 保护区：init_gnugo 内部也可能踩断言，不能让它 abort 掉 JVM
-    if (setjmp(g_jmp_boot) != 0) {
-        g_jmp_boot_active = false;
-        g_inited = false;
-        return 1;
-    }
-    g_jmp_boot_active = true;
-
     // 固定种子：同一局面给同一手，便于复现问题
     init_gnugo(static_cast<float>(cacheMb), 0x5eedu);
 
@@ -162,7 +100,6 @@ Java_com_chuying_engine_GoNativeBridge_nativeInit(JNIEnv*, jobject, jint cacheMb
     }
     set_level(level > 10 ? 10 : level);
 
-    g_jmp_boot_active = false;
     g_inited = true;
     return 0;
 }
@@ -213,14 +150,6 @@ Java_com_chuying_engine_GoNativeBridge_nativeSetPosition(JNIEnv* env, jobject, j
         return -1;
     }
 
-    // 保护区：add_stone() 内部也可能踩 GNU Go 的断言（棋盘满/重复落子等）。
-    if (setjmp(g_jmp) != 0) {
-        g_jmp_active = false;
-        env->ReleaseByteArrayElements(flat, cells, JNI_ABORT);
-        return -1;
-    }
-    g_jmp_active = true;
-
     // 复位棋盘（同时清掉劫点/手数/提子数；komi 是独立全局量，不受影响）
     gnugo_clear_board(g_boardsize);
 
@@ -248,7 +177,6 @@ Java_com_chuying_engine_GoNativeBridge_nativeSetPosition(JNIEnv* env, jobject, j
     }
     // 让 GNU Go 知道棋局走到哪一步了（每次都是 clear_board + 摆子，手数会被清零）
     movenum = placed;
-    g_jmp_active = false;
     return placed;
 }
 
@@ -264,20 +192,7 @@ Java_com_chuying_engine_GoNativeBridge_nativeGenmove(JNIEnv*, jobject, jint modC
     }
     float value = 0.0f;
     int resign = 0;
-    int move = 0;
-
-    // 保护区：GNU Go 内部断言失败时 abortgo() 会 longjmp 回这里，
-    // 而不是 abort() 杀掉 JVM（详见文件顶部 chuying_gnugo_abortgo_exit 的说明）。
-    if (setjmp(g_jmp) != 0) {
-        g_jmp_active = false;
-        // 返回 -3 = ERROR：Java 侧跳过这一手，等下一回合重新注入棋面再算。
-        // 每次 genmove 都是「整盘重注入」的无状态设计，跳过一手不会污染后续计算。
-        return -3;
-    }
-    g_jmp_active = true;
-    move = genmove(toGnuColor(modColor), &value, &resign);
-    g_jmp_active = false;
-
+    const int move = genmove(toGnuColor(modColor), &value, &resign);
     if (resign) {
         return -2;
     }

@@ -55,9 +55,6 @@ public class ProxyPlayClient {
     /** 引擎走法被拒绝等导致局面卡住时，超过该时间重新允许走当前局面 */
     private static final long STUCK_TIMEOUT_MS = 10_000;
 
-    /** 棋种分派异常的上次记录时间（用于限流，避免每 tick 刷屏） */
-    private static long lastDispatchErrorAt = 0;
-
     /** 待执行的模拟点击（象棋需要"选子→落子"两步，间隔数 tick） */
     private static final ArrayDeque<PendingClick> PENDING_CLICKS = new ArrayDeque<>();
     /** 象棋两步点击的间隔 tick */
@@ -312,30 +309,16 @@ public class ProxyPlayClient {
             return;
         }
         BlockEntity te = mc.level.getBlockEntity(center);
-        // 总兜底：任何一个棋种的适配层（大量反射调第三方模组）抛出的异常都不许冒泡到
-        // Minecraft 的 tick 循环——那里的未捕获异常会直接崩客户端。
-        // 这里 catch Throwable 而不只是 Exception：反射失败最常见的是
-        // NoClassDefFoundError / NoSuchMethodError / ExceptionInInitializerError，都是 Error。
-        try {
-            if (ShogiCompat.isShogiTile(te)) {
-                tryShogi(mc, center, facing, te);
-            } else if (te instanceof TileEntityCChess c) {
-                tryCChess(mc, center, facing, c);
-            } else if (te instanceof TileEntityWChess w) {
-                tryWChess(mc, center, facing, w);
-            } else if (te instanceof TileEntityGomoku g) {
-                tryGomoku(mc, center, g);
-            } else if (Config.GO_ENABLED.get() && GoCompat.isGoTile(te)) {
-                tryGo(mc, center, te);
-            }
-        } catch (Throwable t) {
-            // 限流：每局/每 10 秒最多记一次，避免每 tick 刷屏把日志撑爆
-            if (lastDispatchErrorAt == 0 || System.currentTimeMillis() - lastDispatchErrorAt > 10_000) {
-                lastDispatchErrorAt = System.currentTimeMillis();
-                Chuying.LOGGER.error("[chuying] 棋种分派异常（已跳过本次，不影响游戏）te={}",
-                        te == null ? "null" : te.getClass().getName(), t);
-            }
-            ProxyPlayState.busy = false;
+        if (ShogiCompat.isShogiTile(te)) {
+            tryShogi(mc, center, facing, te);
+        } else if (te instanceof TileEntityCChess c) {
+            tryCChess(mc, center, facing, c);
+        } else if (te instanceof TileEntityWChess w) {
+            tryWChess(mc, center, facing, w);
+        } else if (te instanceof TileEntityGomoku g) {
+            tryGomoku(mc, center, g);
+        } else if (Config.GO_ENABLED.get() && GoCompat.isGoTile(te)) {
+            tryGo(mc, center, te);
         }
     }
 

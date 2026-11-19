@@ -24,7 +24,7 @@ An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) o
 | **One-key Proxy Play** | Toggle on/off with **K**; keybind remappable in Controls |
 | **4 Think Strength levels** | LOW / DEFAULT / HIGH / MAX — adjustable in-game, applied to the very next move |
 | **Avoid Draw (Chess)** | Push Stockfish to actively seek the win instead of settling for a draw |
-| **Auto-extract engines** | **One jar for Windows / Linux / macOS (including Intel Macs)** — only the current OS's copy is extracted |
+| **Auto-extract engines** | Bundled Windows / Linux / macOS native libraries, extracted to `config/chuying/engines/` on first run |
 | **Shogi support** | With the [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) addon installed, shogi is played for you too (using its bundled Sunfish, zero extra size) |
 | **ChessPVP support** | With the [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) addon installed, PVP games are played for you too: only your own side is played (requires that addon's sneak-click interaction) |
 | **Go support** | With [TouhouGO](https://github.com/moyinsky/TouhouGO) installed: 15×15 Go with area scoring, played by [GNU Go](https://www.gnu.org/software/gnugo/) running **in-process** |
@@ -42,17 +42,15 @@ An addon for [Touhou Little Maid](https://modrinth.com/mod/touhou-little-maid) o
 | Shogi | Sunfish bundled with `tlm_shogi` | reflection | not shipped here; needs the addon installed |
 | Go | [GNU Go](https://www.gnu.org/software/gnugo/) 3.8 | engine C API (called directly, in-process) | bundled in the jar; the board comes from TouhouGO |
 
-## One Jar for Every OS
+## Platform Packages
 
-**Since 3.0 there are no per-OS builds** — a single jar works everywhere:
+One build produces three jars — pick the one for your OS (don't mix them up):
 
 | File | OS |
 |---|---|
-| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-universal.jar` | Windows x64 / Linux x64 / macOS (**both** Apple Silicon and Intel) |
-
-> Before 3.0 this was three jars each carrying its own copy of the engines (1219 MB total).
-> Now it is one jar, and the Stockfish NNUE nets are shared instead of embedded per binary:
-> about 129 MB in total.
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-windows.jar` | Windows |
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-linux.jar` | Linux (x86-64, AVX2) |
+| `Chuying.Proxy.Play<ver>-NeoForge-1.21.1-macos.jar` | macOS (Apple Silicon) |
 
 > Engines are extracted automatically to `config/chuying/engines/` on first run.
 
