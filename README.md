@@ -24,7 +24,7 @@
 | **一键代打** | **K** 键随时启停，可在 控制 里改键 |
 | **思考强度四档** | 低 / 默认 / 高 / 极致 —— 游戏内实时调整，下一步立即生效 |
 | **避和强度（国象）** | 让 Stockfish 主动求胜、拒绝被拖平 |
-| **引擎自动解压** | 内置 Windows / Linux / macOS 原生库，首次运行解压到 `config/chuying/engines/` |
+| **引擎自动解压** | **一个 jar 通吃 Windows / Linux / macOS（含 Intel Mac）**，首次运行只解压当前系统需要的那份 |
 | **将棋联动** | 装了将棋扩展 [tlm_shogi](https://www.curseforge.com/minecraft/mc-mods/touhoulittlemaid-shogi) 也照样代打（走它自带的 Sunfish，不额外占体积） |
 | **棋圣 PVP 代打** | 装了棋圣 [ChessPVP](https://modrinth.com/mod/tlmcp-chesspvp) 时支持 PVP 代打：只替自己在对局中的一方落子（需该扩展支持的潜行点击交互） |
 | **围棋代打** | 装了 [TouhouGO](https://github.com/moyinsky/TouhouGO)（车万女仆·围棋棋盘）时支持围棋：15 路、数子规则，GNU Go 引擎**进程内直调** |
@@ -41,15 +41,16 @@
 | 将棋 | `tlm_shogi` 自带的 Sunfish | 反射调用 | 不随本模组分发，装了扩展才启用 |
 | 围棋 | [GNU Go](https://www.gnu.org/software/gnugo/) 3.8 | 引擎 C API（进程内直调） | 内置，随 jar 分发；棋盘来自 TouhouGO |
 
-## 三平台分发包
+## 一个 jar 通吃所有系统
 
-一次构建产出三版 jar，按你的系统选择对应版本，**别下错了**：
+**3.0 起不再按系统分版本**——只有一个 jar，下载即用：
 
 | 文件 | 适用系统 |
 |---|---|
-| `Chuying.Proxy.Play<版本>-NeoForge-1.21.1-windows.jar` | Windows |
-| `Chuying.Proxy.Play<版本>-NeoForge-1.21.1-linux.jar` | Linux（x86-64, AVX2） |
-| `Chuying.Proxy.Play<版本>-NeoForge-1.21.1-macos.jar` | macOS（Apple Silicon） |
+| `Chuying.Proxy.Play<版本>-NeoForge-1.21.1-universal.jar` | Windows x64 / Linux x64 / macOS（Apple Silicon **和** Intel Mac） |
+
+> 3.0 之前是三个 jar 各带一份引擎（共 1219 MB）。现在合并成一个，
+> 且 Stockfish 权重不再编进二进制而是三平台共用一份，总体积降到约 129 MB。
 
 > 引擎首次运行时自动解压到 `config/chuying/engines/`，无需手动配置。
 
@@ -99,17 +100,35 @@
 
 ## 开发者：本地构建
 
-引擎二进制（以及将棋用的扩展 jar）不进 git 仓库：由 GitHub Actions `native-build` 工作流在 CI 上拉取引擎源码、编译成三平台 JNI 原生库并上传 artifact；下载后放进 `src/main/resources/engines/<平台>/`，权重等数据文件放 `engines/shared/`。
+引擎二进制不进 git 仓库：由 GitHub Actions `native-build` 工作流在**临时分支**上拉取引擎源码、编译成三平台 JNI 原生库，编译完自动删除该临时分支，产物 `engines-unified` 可下载。**CI 只编原生库，jar 在本地打**。
 
-JNI 桥接层与 CMake 脚本（`native/CMakeLists.txt`、`native/src/*.cpp`）**随仓库分发**（2.1 起也在发布 tag 内），补丁与应用方式全在 `.github/scripts/build_native.sh`。
-
-```bash
-# 1. 把 CI 产物 chuying_*.dll|so|dylib 放进 src/main/resources/engines/{windows,linux,macos}/
-# 2. 一次构建出三版 jar
-./gradlew build
+```powershell
+# 1. 下载并解压 CI 的 engines-unified 产物到某个目录
+# 2. 一键装引擎 + 打包（会校验 4 引擎 × 3 平台是否齐全）
+.\package-local.ps1 -UnifiedDir ..\..\_release_tmp\unified
 ```
 
-产物在 `build/libs/`：`chuying-<版本>.jar`（骨架）+ `Chuying.Proxy.Play<版本>-NeoForge-1.21.1-{windows,linux,macos}.jar`。
+脚本会把产物按 `os-arch` 铺进 `src/main/resources/engines/`：
+
+```
+engines/
+├── windows-x86_64/     chuying_*.dll
+├── linux-x86_64/       chuying_*.so
+├── macos-universal/    chuying_*.dylib   (arm64 + x86_64 合一)
+└── shared/             pikafish.nnue、stockfish/*.nnue、rapfi/*
+```
+
+产物在 `build/libs/`：`Chuying.Proxy.Play<版本>-NeoForge-1.21.1-universal.jar`（发布用）+ `chuying-<版本>.jar`（骨架）。
+
+### 加新引擎
+
+引擎层是登记表驱动的，**加引擎只改一个文件** `EngineRegistry.java`：
+
+1. `native/CMakeLists.txt` 加一个 `chuying_bridge(chuying_xxx ...)`，`jni_exports.cpp` 加对应 `CHUYING_ENGINE_XXX` 分支；
+2. `EngineRegistry` 加一条 `EngineSpec.of("xxx", "chuying_xxx", EngineKind.UCI, "xxx.nnue")`；
+3. 若协议族是已有的 `UCI` / `GOMOKU`，`EngineManager` 加一行 getter 即可；全新协议族才需要新写包装类。
+
+`EngineExtractor`（解压哪些文件）和 `EngineManager`（怎么创建）都从登记表推导，不需要同步修改。
 
 ## 许可证
 

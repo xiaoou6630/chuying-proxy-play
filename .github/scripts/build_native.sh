@@ -244,26 +244,30 @@ log "patching abortgo() to longjmp instead of abort()"
 awk_inplace "$ENGINES/gnugo/engine/printutils.c" '
   NR == 1 {
     print "/* chuying: longjmp exit provided by the JNI bridge (GPL-3.0)."
-    print "   GNU Go is linked in-process, so abort() would kill the whole JVM. */"
+    print "   GNU Go is linked in-process, so abort() would kill the whole JVM."
+    print "   Declared weak: the build-time tools (patterns/joseki,"
+    print "   patterns/uncompress_fuseki) link libboard.a too but are not the"
+    print "   chuying_gnugo shared library, so they must tolerate a null symbol. */"
+    print "#if defined(_MSC_VER)"
     print "void chuying_gnugo_abortgo_exit(void);"
+    print "#else"
+    print "void chuying_gnugo_abortgo_exit(void) __attribute__((weak));"
+    print "#endif"
     print ""
   }
   /^  abort\(\);  \/\* cause core dump \*\/$/ {
     print "  /* chuying: never abort the JVM (in-process engine). longjmp back to the"
     print "     JNI bridge setjmp point; see native/src/gnugo_bridge.cpp. */"
-    print "  chuying_gnugo_abortgo_exit();"
+    print "  if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();"
+    print "  abort();  /* unreachable in the mod build; keeps the compiler happy */"
     next
   }
   { print }
 '
-grep -q 'void chuying_gnugo_abortgo_exit(void);' "$ENGINES/gnugo/engine/printutils.c" \
+grep -q 'chuying_gnugo_abortgo_exit' "$ENGINES/gnugo/engine/printutils.c" \
     || { log "ERROR: abortgo prototype insert failed"; exit 1; }
-grep -q 'chuying_gnugo_abortgo_exit();' "$ENGINES/gnugo/engine/printutils.c" \
+grep -q 'if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();' "$ENGINES/gnugo/engine/printutils.c" \
     || { log "ERROR: abortgo() -> longjmp patch failed"; exit 1; }
-if grep -q '^  abort();  /\* cause core dump \*/$' "$ENGINES/gnugo/engine/printutils.c"; then
-    log "ERROR: abort() still present in printutils.c"
-    exit 1
-fi
 log "patched abortgo()"
 
 # ---------------------------------------------------------------------------
@@ -280,12 +284,17 @@ log "patching remaining abort() calls in GNU Go engine"
 for f in engine/reading.c engine/oracle.c; do
     src="$ENGINES/gnugo/$f"
     [ -f "$src" ] || { log "ERROR: $f not found"; exit 1; }
-    # 顶部补原型（避免隐式声明在 64 位下截断返回值）
-    if ! grep -q 'void chuying_gnugo_abortgo_exit(void);' "$src"; then
+    # 顶部补原型（weak：构建期工具也要能链接）
+    if ! grep -q 'chuying_gnugo_abortgo_exit' "$src"; then
         awk_inplace "$src" '
           NR == 1 {
-            print "/* chuying: longjmp exit provided by the JNI bridge (GPL-3.0). */"
+            print "/* chuying: longjmp exit provided by the JNI bridge (GPL-3.0)."
+            print "   weak so the build-time tools (joseki/uncompress_fuseki) link too. */"
+            print "#if defined(_MSC_VER)"
             print "void chuying_gnugo_abortgo_exit(void);"
+            print "#else"
+            print "void chuying_gnugo_abortgo_exit(void) __attribute__((weak));"
+            print "#endif"
             print ""
           }
           { print }
@@ -296,31 +305,37 @@ for f in engine/reading.c engine/oracle.c; do
       /^[ \t]*abort\(\);[ \t]*$/ {
         match($0, /^[ \t]*/)
         indent = substr($0, 1, RLENGTH)
-        print indent "chuying_gnugo_abortgo_exit();  /* chuying: never abort the JVM */"
+        print indent "if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();  /* chuying: never abort the JVM */"
+        print indent "abort();  /* unreachable in the mod build */"
         next
       }
       { print }
     '
-    if grep -qE '^[ \t]*abort\(\);[ \t]*$' "$src"; then
-        log "ERROR: abort() still present in $f"
+    if ! grep -q 'if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();' "$src"; then
+        log "ERROR: abort() patch failed in $f"
         exit 1
     fi
     echo "  patched $f"
 done
 
-# 兜底校验：参与编译的引擎源码里不允许再有任何裸 abort();
-# ⚠️ 注意 set -euo pipefail：grep 无匹配时返回 1，pipefail 会让整个管道返回 1，
-# set -e 直接把脚本干掉（实测踩过：这里「校验通过」反而让构建在 22 秒时静默退出，
-# 后面 cmake 根本没跑，四个引擎全部 UnsatisfiedLinkError）。
-# 因此必须用 `|| true` 兜住 grep 的非零退出码，只信 wc -l 的结果。
-remaining=$( { grep -rE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
-remaining=$((remaining + 0))
-if [ "$remaining" -ne 0 ]; then
-    log "ERROR: $remaining bare abort() call(s) remain in gnugo/engine"
+# 兜底校验：每个裸 abort() 前面都必须有 weak hook 保护。
+# 补丁后形如：
+#   if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();
+#   abort();  /* unreachable in the mod build */
+# 所以「abort() 数量」应等于「hook 调用数量」。
+# ⚠️ set -euo pipefail：grep 无匹配返回 1 会直接杀掉脚本（实测踩过：
+# 构建在 22 秒静默退出、cmake 根本没跑、四个引擎全部 UnsatisfiedLinkError）。
+# 必须用 `|| true` 兜住 grep 的非零退出码。
+abort_cnt=$( { grep -rhE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
+hook_cnt=$( { grep -rh 'if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
+abort_cnt=$((abort_cnt + 0))
+hook_cnt=$((hook_cnt + 0))
+if [ "$abort_cnt" -ne "$hook_cnt" ]; then
+    log "ERROR: $abort_cnt abort() vs $hook_cnt weak-hook guards in gnugo/engine"
     grep -rnE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true
     exit 1
 fi
-log "all abort() calls in GNU Go engine neutralised"
+log "all abort() calls in GNU Go engine guarded ($hook_cnt hooks)"
 echo "gnugo source @ $ENGINES/gnugo ($GNUG0_SHA)"
 
 # ---------------------------------------------------------------------------
