@@ -60,3 +60,4 @@ native/java-test/out/
 native/java-test/pikafish.nnue
 
 native_artifacts/
+native/java-test/CrashRepro.java
