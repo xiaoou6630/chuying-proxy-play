@@ -58,10 +58,19 @@ extract_7z() {
 git_clone() { # url dir [ref]
     local url="$1" dir="$2" ref="${3:-}"
     rm -rf "$dir"
-    if [ -n "$ref" ]; then
-        git clone -q --depth 1 --branch "$ref" "$url" "$dir"
-    else
+    if [ -z "$ref" ]; then
         git clone -q --depth 1 "$url" "$dir"
+    elif [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+        # 完整 40 位 SHA：--branch 不接受 commit 哈希（"Remote branch ... not found"），
+        # 必须 init + fetch 指定 commit。上游未打 tag 时这是唯一固定版本的办法。
+        mkdir -p "$dir"
+        git -C "$dir" init -q
+        git -C "$dir" remote add origin "$url"
+        git -C "$dir" fetch -q --depth 1 origin "$ref"
+        git -C "$dir" checkout -q FETCH_HEAD
+    else
+        # 分支名或 tag
+        git clone -q --depth 1 --branch "$ref" "$url" "$dir"
     fi
     echo "$dir @ $(git -C "$dir" rev-parse HEAD)"
 }
