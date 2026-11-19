@@ -19,11 +19,30 @@ if(MSVC)
 else()
     find_package(Threads REQUIRED)
     link_libraries(Threads::Threads)
-    # Mirrors Pikafish/Stockfish Makefile minimum arch flags
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64)")
+    # Mirrors Pikafish/Stockfish Makefile minimum arch flags.
+    #
+    # ⚠️ macOS 交叉编译：CMAKE_SYSTEM_PROCESSOR 反映的是**宿主机**架构，
+    # 不是 CMAKE_OSX_ARCHITECTURES 指定的目标架构。CI 的 macos runner 是
+    # arm64 机器，即使 -DCMAKE_OSX_ARCHITECTURES=x86_64，这里仍会走 arm64 分支、
+    # 定义 USE_NEON=8，于是 x86_64 分片也在编译 NEON 代码：
+    #   error: unknown type name 'int32x4_t' / 'float32x4_t'
+    #   error: use of undeclared identifier 'vaddvq_s32'
+    # 因此 macOS 上必须看 CMAKE_OSX_ARCHITECTURES。
+    set(CHUYING_TARGET_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+    if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+        if(CMAKE_OSX_ARCHITECTURES MATCHES ";")
+            message(FATAL_ERROR
+                "chuying: 不支持一次编译多个 macOS 架构（SIMD 宏只能展开一次）。"
+                "请分架构各编一遍再用 lipo 合并，见 .github/scripts/build_native.sh")
+        endif()
+        set(CHUYING_TARGET_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+    endif()
+    message(STATUS "chuying: target arch = ${CHUYING_TARGET_ARCH}")
+
+    if(CHUYING_TARGET_ARCH MATCHES "(x86_64)|(AMD64)|(amd64)")
         add_compile_definitions(USE_SSE2 USE_POPCNT IS_64BIT)
         add_compile_options(-msse3 -mpopcnt)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
+    elseif(CHUYING_TARGET_ARCH MATCHES "(aarch64)|(arm64)|(ARM64)")
         add_compile_definitions(USE_NEON=8 IS_64BIT)
     endif()
 endif()
