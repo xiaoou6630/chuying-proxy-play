@@ -3,6 +3,11 @@
 # Steps: clone engine sources -> rename main() -> compile sources directly
 # into chuying_<engine> shared libs alongside the bridge (no engine CMake).
 # No OS process is spawned; engines run in-process via redirected streams.
+#
+# 3.0: one jar for every OS. macOS builds a UNIVERSAL binary (arm64 + x86_64)
+# so Intel Macs stop getting UnsatisfiedLinkError; the platform directory name
+# is os-arch (macos-universal / windows-x86_64 / linux-x86_64) to match
+# EngineExtractor.platform().
 # Usage: bash .github/scripts/build_native.sh <windows|linux|macos>
 set -euo pipefail
 
@@ -12,6 +17,13 @@ cd "$ROOT"
 ENGINES="native/engines"
 mkdir -p "$ENGINES" native/dist
 
+# 平台目录名（与 CMakeLists 的 CHUYING_PLATFORM 一致）
+case "$PLATFORM" in
+    windows) PLAT_DIR="windows-x86_64" ;;
+    linux)   PLAT_DIR="linux-x86_64" ;;
+    macos)   PLAT_DIR="macos-universal" ;;
+    *) echo "ERROR: unknown platform $PLATFORM"; exit 1 ;;
+esac
 log() { echo "==> $*"; }
 
 # portable in-place sed: GNU needs -i, BSD (macOS) needs -i ''
@@ -46,10 +58,19 @@ extract_7z() {
 git_clone() { # url dir [ref]
     local url="$1" dir="$2" ref="${3:-}"
     rm -rf "$dir"
-    if [ -n "$ref" ]; then
-        git clone -q --depth 1 --branch "$ref" "$url" "$dir"
-    else
+    if [ -z "$ref" ]; then
         git clone -q --depth 1 "$url" "$dir"
+    elif [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+        # 完整 40 位 SHA：--branch 不接受 commit 哈希（"Remote branch ... not found"），
+        # 必须 init + fetch 指定 commit。上游未打 tag 时这是唯一固定版本的办法。
+        mkdir -p "$dir"
+        git -C "$dir" init -q
+        git -C "$dir" remote add origin "$url"
+        git -C "$dir" fetch -q --depth 1 origin "$ref"
+        git -C "$dir" checkout -q FETCH_HEAD
+    else
+        # 分支名或 tag
+        git clone -q --depth 1 --branch "$ref" "$url" "$dir"
     fi
     echo "$dir @ $(git -C "$dir" rev-parse HEAD)"
 }
@@ -59,7 +80,13 @@ git_clone() { # url dir [ref]
 # ---------------------------------------------------------------------------
 log "cloning engines"
 SF_SHA=$(git_clone https://github.com/official-stockfish/Stockfish.git "$ENGINES/stockfish" sf_17.1 | awk '{print $NF}')
-PF_SHA=$(git_clone https://github.com/official-pikafish/Pikafish.git  "$ENGINES/pikafish"  ""        | awk '{print $NF}')
+# Pikafish **必须固定 commit**：上游 master 随时会变 NNUE 架构，而 pikafish.nnue
+# 权重是从 release 包里取的、架构与引擎强绑定。3.0 首次构建时就踩到了：
+#   2.1 用 b562d6a（2026-09-23）→ 权重加载正常
+#   3.0 拉到 8d8db92（2026-11-15）→ NNUE 架构不匹配，引擎在 isready 阶段卡死，
+#                                整个中国象棋代打不可用
+# 固定为 2.1 验证过的 b562d6a，保证引擎与权重配套。
+PF_SHA=$(git_clone https://github.com/official-pikafish/Pikafish.git  "$ENGINES/pikafish"  b562d6aeac5401879e973dc53ddb56053f07bb6a | awk '{print $NF}')
 RF_SHA=$(git_clone https://github.com/dhbloo/rapfi.git                "$ENGINES/rapfi"      250615    | awk '{print $NF}')
 
 # Stockfish embeds its NNUE nets at compile time (INCBIN); fetch them.
@@ -199,6 +226,96 @@ patch_pos_guard countstones
 grep -c 'never abort the JVM on an invalid position' "$ENGINES/gnugo/engine/board.c" | grep -q '^3$' \
     || { log "ERROR: expected 3 position guards in board.c"; exit 1; }
 log "patched GNU Go latent bugs"
+
+# ---------------------------------------------------------------------------
+# GNU Go 的 abortgo() -> abort() 必须干掉：进程内引擎里 abort() 会直接杀掉 JVM。
+#   实测崩溃（3.0 首测，第 224 手、棋盘只剩 6 个空点）：
+#     ***assertion failure: board.c:3042 - ON_BOARD1(pos) near PASS***
+#     gnugo 3.8 (seed ...): You stepped on a bug.
+#   即 GNU Go 把 PASS 哨兵(-1) 当坐标传进 is_ko() 一类函数。
+#   这个 bug 在 2.1 里也存在（源码/补丁完全相同），只是没下到那么深。
+#
+#   修法：把 printutils.c 里 abortgo() 结尾的 `abort();` 换成调用桥接层提供的
+#   chuying_gnugo_abortgo_exit()，后者 longjmp 回 nativeGenmove/nativeSetPosition
+#   的 setjmp 点 —— 引擎内部踩 bug 退化为「这一手算不出来」，不崩游戏。
+# ---------------------------------------------------------------------------
+log "patching abortgo() to longjmp instead of abort()"
+# 一步到位：插原型 + 换 abort()。分两次 awk 会因 NR==1 规则重复触发而出错。
+awk_inplace "$ENGINES/gnugo/engine/printutils.c" '
+  NR == 1 {
+    print "/* chuying: longjmp exit provided by the JNI bridge (GPL-3.0)."
+    print "   GNU Go is linked in-process, so abort() would kill the whole JVM. */"
+    print "void chuying_gnugo_abortgo_exit(void);"
+    print ""
+  }
+  /^  abort\(\);  \/\* cause core dump \*\/$/ {
+    print "  /* chuying: never abort the JVM (in-process engine). longjmp back to the"
+    print "     JNI bridge setjmp point; see native/src/gnugo_bridge.cpp. */"
+    print "  chuying_gnugo_abortgo_exit();"
+    next
+  }
+  { print }
+'
+grep -q 'void chuying_gnugo_abortgo_exit(void);' "$ENGINES/gnugo/engine/printutils.c" \
+    || { log "ERROR: abortgo prototype insert failed"; exit 1; }
+grep -q 'chuying_gnugo_abortgo_exit();' "$ENGINES/gnugo/engine/printutils.c" \
+    || { log "ERROR: abortgo() -> longjmp patch failed"; exit 1; }
+if grep -q '^  abort();  /\* cause core dump \*/$' "$ENGINES/gnugo/engine/printutils.c"; then
+    log "ERROR: abort() still present in printutils.c"
+    exit 1
+fi
+log "patched abortgo()"
+
+# ---------------------------------------------------------------------------
+# GNU Go 里 **不止一处** abort()。实测 grep 到 7 处，其中 reading.c 的 3 处在
+# default: 分支上，是读棋核心路径 —— 棋盘接近下满时最可能命中，而 abort() 会
+# 直接杀掉 JVM。这里把所有会参与编译的 `abort();` 统一换成 longjmp 出口。
+#   engine/printutils.c:297  abortgo()          （已在上面处理）
+#   engine/reading.c:3239/3382/3476  default: 分支（读棋核心，最危险）
+#   engine/oracle.c:166      error()
+# 另外 2 处在 interface/gtp_examples/{metamachine,vanilla}.c，是 GTP 示例程序，
+# 不参与 chuying_gnugo 的编译，无需处理。
+# ---------------------------------------------------------------------------
+log "patching remaining abort() calls in GNU Go engine"
+for f in engine/reading.c engine/oracle.c; do
+    src="$ENGINES/gnugo/$f"
+    [ -f "$src" ] || { log "ERROR: $f not found"; exit 1; }
+    # 顶部补原型（避免隐式声明在 64 位下截断返回值）
+    if ! grep -q 'void chuying_gnugo_abortgo_exit(void);' "$src"; then
+        awk_inplace "$src" '
+          NR == 1 {
+            print "/* chuying: longjmp exit provided by the JNI bridge (GPL-3.0). */"
+            print "void chuying_gnugo_abortgo_exit(void);"
+            print ""
+          }
+          { print }
+        '
+    fi
+    # 所有裸 abort(); 换成 longjmp 出口，保留原缩进
+    awk_inplace "$src" '
+      /^[ \t]*abort\(\);[ \t]*$/ {
+        match($0, /^[ \t]*/)
+        indent = substr($0, 1, RLENGTH)
+        print indent "chuying_gnugo_abortgo_exit();  /* chuying: never abort the JVM */"
+        next
+      }
+      { print }
+    '
+    if grep -qE '^[ \t]*abort\(\);[ \t]*$' "$src"; then
+        log "ERROR: abort() still present in $f"
+        exit 1
+    fi
+    echo "  patched $f"
+done
+
+# 兜底校验：参与编译的引擎源码里不允许再有任何裸 abort();
+remaining=$(grep -rE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' | wc -l)
+if [ "$remaining" -ne 0 ]; then
+    log "ERROR: $remaining bare abort() call(s) remain in gnugo/engine"
+    grep -rnE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true
+    exit 1
+fi
+log "all abort() calls in GNU Go engine neutralised"
 echo "gnugo source @ $ENGINES/gnugo ($GNUG0_SHA)"
 
 # ---------------------------------------------------------------------------
@@ -282,12 +399,22 @@ done
 # ---------------------------------------------------------------------------
 CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
 # Rapfi: lock SIMD for portability (its own CMake auto-detects host with -march=native).
-# SSE x86 only; on ARM everything off (POC correctness first).
 if [ "$PLATFORM" = "macos" ]; then
+    # 3.0: UNIVERSAL binary — arm64 (Apple Silicon) + x86_64 (Intel).
+    # 之前只编 arm64（macos-latest 是 arm64 runner），Intel Mac 加载必 UnsatisfiedLinkError。
+    #
+    # 注意：**不能**用 CMAKE_OSX_ARCHITECTURES="arm64;x86_64" 一次性编。
+    # Rapfi 的 eval/simdops.h 按编译宏选 NEON/SSE 类型，而 CMake 多架构构建时
+    # 宏只展开一次，结果 x86_64 分片也在编译 NEON 代码：
+    #   error: unknown type name 'float32x4_t'
+    #   error: use of undeclared identifier 'vld1q_s8'
+    # 正确做法：分两个架构各编一遍（各自带正确的 SIMD 开关），再用 lipo 合并。
+    # 合并逻辑在下面 "universal 合并" 一节，这里先编 arm64。
     CMAKE_ARGS+=(-DUSE_SSE=OFF -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
-                 -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+                 -DUSE_VNNI=OFF -DUSE_NEON=ON -DUSE_NEON_DOTPROD=OFF
                  -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
-                 -DCMAKE_OSX_ARCHITECTURES=arm64)
+                 -DCMAKE_OSX_ARCHITECTURES=arm64
+                 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
 else
     CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
                  -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
@@ -329,20 +456,84 @@ case "$PLATFORM" in
 esac
 
 # ---------------------------------------------------------------------------
+# 3b. macOS: 再编一遍 x86_64，然后 lipo 合并成 universal
+#     （不能一次编两个架构，原因见上面 CMAKE_ARGS 处的注释）
+# ---------------------------------------------------------------------------
+if [ "$PLATFORM" = "macos" ]; then
+    ARM_DIR="native/build-arm64"
+    X86_DIR="native/build-x86_64"
+    log "macOS: 复制 arm64 产物到 $ARM_DIR"
+    rm -rf "$ARM_DIR"
+    cp -R native/build "$ARM_DIR"
+
+    log "macOS: 编译 x86_64 分片（USE_SSE=ON / USE_NEON=OFF）"
+    X86_ARGS=(-S native -B "$X86_DIR" -DCMAKE_BUILD_TYPE=Release
+              -DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
+              -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+              -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
+              -DCMAKE_OSX_ARCHITECTURES=x86_64
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
+    cmake "${X86_ARGS[@]}"
+    cmake --build "$X86_DIR" --parallel
+
+    log "macOS: lipo 合并 arm64 + x86_64"
+    mkdir -p native/dist
+    for name in chuying_stockfish chuying_pikafish chuying_rapfi chuying_gnugo; do
+        a="$ARM_DIR/$name.dylib"
+        x="$X86_DIR/$name.dylib"
+        if [ -f "$a" ] && [ -f "$x" ]; then
+            lipo -create "$a" "$x" -output "native/dist/$name.dylib"
+            echo "  merged $name.dylib -> $(lipo -archs native/dist/$name.dylib)"
+        else
+            log "ERROR: 缺少分片 $name (arm=$([ -f "$a" ] && echo ok || echo missing) x86=$([ -f "$x" ] && echo ok || echo missing))"
+            exit 1
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
 # 4. Collect outputs, strip symbols, verify runtime dependencies
 # ---------------------------------------------------------------------------
-case "$PLATFORM" in
-    windows) find native/build -name 'chuying_*.dll'   -exec cp {} native/dist/ \; ;;
-    linux)   find native/build -name 'chuying_*.so'    -exec cp {} native/dist/ \; ;;
-    macos)   find native/build -name 'chuying_*.dylib' -exec cp {} native/dist/ \; ;;
-esac
+if [ "$PLATFORM" != "macos" ]; then
+    case "$PLATFORM" in
+        windows) find native/build -name 'chuying_*.dll' -exec cp {} native/dist/ \; ;;
+        linux)   find native/build -name 'chuying_*.so'  -exec cp {} native/dist/ \; ;;
+    esac
+fi
 [ -n "$(ls native/dist/chuying_* 2>/dev/null)" ] || { log "ERROR: no chuying_* outputs"; exit 1; }
+
+# macOS: verify both slices actually made it into every dylib. A silent
+# arm64-only build is exactly the bug this fixes, so fail loudly instead.
+if [ "$PLATFORM" = "macos" ]; then
+    log "verifying universal (arm64 + x86_64) slices"
+    for f in native/dist/chuying_*.dylib; do
+        archs="$(lipo -archs "$f" 2>/dev/null || echo '?')"
+        echo "  $(basename "$f"): $archs"
+        case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) log "ERROR: $f is not universal (archs=$archs)"; exit 1 ;;
+        esac
+    done
+fi
 
 log "stripping symbols"
 case "$PLATFORM" in
+    # strip -x on a universal binary keeps both slices (strip understands fat files)
     macos) find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip -x {} \; || true ;;
     *)     find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip --strip-unneeded {} \; || true ;;
 esac
+
+# Re-verify after strip: some strip builds silently drop slices.
+if [ "$PLATFORM" = "macos" ]; then
+    for f in native/dist/chuying_*.dylib; do
+        archs="$(lipo -archs "$f" 2>/dev/null || echo '?')"
+        case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) log "ERROR: $f lost a slice during strip (archs=$archs)"; exit 1 ;;
+        esac
+    done
+    log "universal slices intact after strip"
+fi
 
 # The shipped library must not need the MinGW runtime DLLs at load time: they are
 # absent both on the CI runners and on end users' machines, and a missing
@@ -363,14 +554,25 @@ fi
 ls -la native/dist/
 
 cat > native/dist/BUILD_INFO.txt <<EOF
-platform: $PLATFORM
+platform: $PLATFORM ($PLAT_DIR)
 built_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); NNUE nets embedded at build time
+stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); built with NNUE_EMBEDDING_OFF (nets loaded at runtime via EvalFile/EvalFileSmall)
+stockfish_big_net_sha256: $(sha256sum "$ENGINES/stockfish/src/nn-1c0000000000.nnue" 2>/dev/null | cut -d' ' -f1)
+stockfish_small_net_sha256: $(sha256sum "$ENGINES/stockfish/src/nn-37f18f62d772.nnue" 2>/dev/null | cut -d' ' -f1)
 pikafish:  https://github.com/official-pikafish/Pikafish $PF_SHA (GPL-3.0)
 pikafish_net_sha256: $(sha256sum "$ENGINES/pikafish/src/pikafish.nnue" 2>/dev/null | cut -d' ' -f1)
 rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0); built single-threaded (NO_MULTI_THREADING)
 gnugo:     https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz ($GNUG0_SHA) (GPL-3.0-or-later); driven via its C API, in-process
 bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams
 EOF
+
+# 权重文件也放进 dist：CI 的打包 job 从这里取 shared/ 内容，避免三平台各下一遍
+if [ -d "$ENGINES/stockfish/src" ]; then
+    mkdir -p native/dist/nets
+    for net in "$ENGINES"/stockfish/src/*.nnue; do
+        [ -f "$net" ] && cp "$net" native/dist/nets/
+    done
+    [ -f "$ENGINES/pikafish/src/pikafish.nnue" ] && cp "$ENGINES/pikafish/src/pikafish.nnue" native/dist/nets/
+fi
 
 log "done"
