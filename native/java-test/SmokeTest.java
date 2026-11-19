@@ -103,6 +103,19 @@ public class SmokeTest {
             bridge.send("uci");
             ok = expect(bridge, "uciok", 60000);
             if (ok) {
+                // Stockfish 3.0 用 NNUE_EMBEDDING_OFF 编译：权重不在二进制里，
+                // 必须显式下发两个网的路径，否则引擎无法评估（且会静默退化为极弱）。
+                if ("stockfish".equals(engine)) {
+                    String big = findNet("nn-1c0000000000.nnue");
+                    String small = findNet("nn-37f18f62d772.nnue");
+                    System.out.println("[smoke] nets: big=" + big + " small=" + small);
+                    if (big != null) {
+                        bridge.send("setoption name EvalFile value " + big);
+                    }
+                    if (small != null) {
+                        bridge.send("setoption name EvalFileSmall value " + small);
+                    }
+                }
                 bridge.send("isready");
                 ok = expect(bridge, "readyok", 60000);
             }
@@ -207,6 +220,17 @@ public class SmokeTest {
     static void goFail(String what) {
         System.out.println("[smoke] gnugo -> FAIL (" + what + ")");
         System.exit(1);
+    }
+
+    /** 在 ./stockfish/ 或当前目录找 NNUE 权重，返回绝对路径；找不到返回 null */
+    static String findNet(String name) {
+        for (String dir : new String[]{"stockfish", "."}) {
+            java.io.File f = new java.io.File(dir, name);
+            if (f.isFile()) {
+                return f.getAbsolutePath();
+            }
+        }
+        return null;
     }
 
     static boolean expect(Bridge bridge, String want, int timeoutMs)

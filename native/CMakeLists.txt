@@ -19,11 +19,30 @@ if(MSVC)
 else()
     find_package(Threads REQUIRED)
     link_libraries(Threads::Threads)
-    # Mirrors Pikafish/Stockfish Makefile minimum arch flags
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64)")
+    # Mirrors Pikafish/Stockfish Makefile minimum arch flags.
+    #
+    # ⚠️ macOS 交叉编译：CMAKE_SYSTEM_PROCESSOR 反映的是**宿主机**架构，
+    # 不是 CMAKE_OSX_ARCHITECTURES 指定的目标架构。CI 的 macos runner 是
+    # arm64 机器，即使 -DCMAKE_OSX_ARCHITECTURES=x86_64，这里仍会走 arm64 分支、
+    # 定义 USE_NEON=8，于是 x86_64 分片也在编译 NEON 代码：
+    #   error: unknown type name 'int32x4_t' / 'float32x4_t'
+    #   error: use of undeclared identifier 'vaddvq_s32'
+    # 因此 macOS 上必须看 CMAKE_OSX_ARCHITECTURES。
+    set(CHUYING_TARGET_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+    if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+        if(CMAKE_OSX_ARCHITECTURES MATCHES ";")
+            message(FATAL_ERROR
+                "chuying: 不支持一次编译多个 macOS 架构（SIMD 宏只能展开一次）。"
+                "请分架构各编一遍再用 lipo 合并，见 .github/scripts/build_native.sh")
+        endif()
+        set(CHUYING_TARGET_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+    endif()
+    message(STATUS "chuying: target arch = ${CHUYING_TARGET_ARCH}")
+
+    if(CHUYING_TARGET_ARCH MATCHES "(x86_64)|(AMD64)|(amd64)")
         add_compile_definitions(USE_SSE2 USE_POPCNT IS_64BIT)
         add_compile_options(-msse3 -mpopcnt)
-    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
+    elseif(CHUYING_TARGET_ARCH MATCHES "(aarch64)|(arm64)|(ARM64)")
         add_compile_definitions(USE_NEON=8 IS_64BIT)
     endif()
 endif()
@@ -51,12 +70,15 @@ endif()
 include_directories("$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
 
 # Platform folder name, must match EngineExtractor.platform() in the mod.
+# 3.0 起一个 jar 通吃所有系统，目录名带架构（macOS 发 universal 二进制，故不带架构）。
 if(WIN32)
-    set(CHUYING_PLATFORM windows)
+    set(CHUYING_PLATFORM "windows-x86_64")
 elseif(APPLE)
-    set(CHUYING_PLATFORM macos)
+    set(CHUYING_PLATFORM "macos-universal")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
+    set(CHUYING_PLATFORM "linux-arm64")
 else()
-    set(CHUYING_PLATFORM linux)
+    set(CHUYING_PLATFORM "linux-x86_64")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -107,6 +129,14 @@ chuying_bridge(chuying_stockfish
     JNI_DEFINE CHUYING_ENGINE_WCHESS
     SOURCES ${SF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/stockfish/src)
+# Stockfish 17.1 默认用 INCBIN 把 75 MB NNUE 编进二进制。三平台各编一份就是 225 MB 纯重复，
+# 而且 MSVC 不认 INCBIN 会静默失效（见 build_native.sh 注释）。
+# 关掉内嵌后，权重由 Java 侧 setoption name EvalFile / EvalFileSmall 指向解压出的文件，
+# 单库从 76 MB 降到约 1 MB，三平台共用同一份权重。
+target_compile_definitions(chuying_stockfish PRIVATE NNUE_EMBEDDING_OFF)
+# 让 Stockfish 在找不到 EvalFile 时还能退到游戏目录下的解压位置
+target_compile_definitions(chuying_stockfish PRIVATE
+    DEFAULT_NNUE_DIRECTORY="config/chuying/engines/${CHUYING_PLATFORM}/stockfish")
 
 chuying_bridge(chuying_pikafish
     JNI_DEFINE CHUYING_ENGINE_CCHESS
