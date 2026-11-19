@@ -318,21 +318,21 @@ for f in engine/reading.c engine/oracle.c; do
     echo "  patched $f"
 done
 
-# 兜底校验：每个裸 abort() 前面都必须有 weak hook 保护。
-# 补丁后形如：
+# 兜底校验：每个 abort() 前面都必须有 weak hook 保护。
+# 补丁后形如（注意行尾带注释，校验模式必须容忍）：
 #   if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();
 #   abort();  /* unreachable in the mod build */
 # 所以「abort() 数量」应等于「hook 调用数量」。
 # ⚠️ set -euo pipefail：grep 无匹配返回 1 会直接杀掉脚本（实测踩过：
 # 构建在 22 秒静默退出、cmake 根本没跑、四个引擎全部 UnsatisfiedLinkError）。
 # 必须用 `|| true` 兜住 grep 的非零退出码。
-abort_cnt=$( { grep -rhE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
+abort_cnt=$( { grep -rhE '^[ \t]*abort\(\);' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
 hook_cnt=$( { grep -rh 'if (chuying_gnugo_abortgo_exit) chuying_gnugo_abortgo_exit();' "$ENGINES/gnugo/engine" --include='*.c' || true; } | wc -l)
 abort_cnt=$((abort_cnt + 0))
 hook_cnt=$((hook_cnt + 0))
-if [ "$abort_cnt" -ne "$hook_cnt" ]; then
+if [ "$abort_cnt" -ne "$hook_cnt" ] || [ "$hook_cnt" -eq 0 ]; then
     log "ERROR: $abort_cnt abort() vs $hook_cnt weak-hook guards in gnugo/engine"
-    grep -rnE '^[ \t]*abort\(\);[ \t]*$' "$ENGINES/gnugo/engine" --include='*.c' || true
+    grep -rnE '^[ \t]*abort\(\);' "$ENGINES/gnugo/engine" --include='*.c' || true
     exit 1
 fi
 log "all abort() calls in GNU Go engine guarded ($hook_cnt hooks)"
