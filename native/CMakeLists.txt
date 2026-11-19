@@ -192,6 +192,43 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
 
     add_subdirectory(${CHUYING_GNUG0_DIR} gnugo_build)
 
+    # ------------------------------------------------------------------
+    # GNU Go 构建期小工具（mkpat/mkeyes/mkmcpat/joseki/uncompress_fuseki/
+    # extract_fuseki/compress_fuseki）会链接 libboard.a / libengine.a，
+    # 而 printutils.c 里我们把 abort() 换成了 chuying_gnugo_abortgo_exit()，
+    # 于是它们链接时要求该符号存在：
+    #   Undefined symbols for architecture arm64:
+    #     "_chuying_gnugo_abortgo_exit", referenced from:
+    #       _abortgo in libengine.a[27](printutils.c.o)
+    #
+    # Linux 的 ld / Windows 的 lld 能容忍 __attribute__((weak)) 未定义，
+    # **macOS 的 ld64 不行**（实测）。因此给这些工具链接一个桩实现
+    # （src/gnugo_abort_stub.c，直接 abort —— 构建期工具失败就该暴露）。
+    # 运行时用的是 chuying_gnugo 共享库，那里是 gnugo_bridge.cpp 的 longjmp 实现。
+    #
+    # 做法：在 add_subdirectory 之后，把所有「非 chuying_gnugo」的可执行目标
+    # 统一补上这个桩源文件。GNU Go 自己的 CMakeLists 不认识它，所以用
+    # get_property(TARGETS) 遍历。
+    # ------------------------------------------------------------------
+    set(CHUYING_ABORT_STUB ${CMAKE_CURRENT_LIST_DIR}/src/gnugo_abort_stub.c)
+    get_property(_gnugo_all_targets DIRECTORY ${CHUYING_GNUG0_DIR} PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(_gnugo_all_targets APPEND DIRECTORY ${CHUYING_GNUG0_DIR}/patterns PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(_gnugo_all_targets APPEND DIRECTORY ${CHUYING_GNUG0_DIR}/engine PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(_gnugo_all_targets APPEND DIRECTORY ${CHUYING_GNUG0_DIR}/sgf PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(_gnugo_all_targets APPEND DIRECTORY ${CHUYING_GNUG0_DIR}/utils PROPERTY BUILDSYSTEM_TARGETS)
+    get_property(_gnugo_all_targets APPEND DIRECTORY ${CHUYING_GNUG0_DIR}/interface PROPERTY BUILDSYSTEM_TARGETS)
+    if(_gnugo_all_targets)
+        foreach(_t ${_gnugo_all_targets})
+            get_target_property(_t_type ${_t} TYPE)
+            if(_t_type STREQUAL "EXECUTABLE")
+                target_sources(${_t} PRIVATE ${CHUYING_ABORT_STUB})
+                message(STATUS "chuying: abort stub -> ${_t}")
+            endif()
+        endforeach()
+    else()
+        message(WARNING "chuying: 未能枚举 GNU Go 子目录目标，构建期工具可能链接失败")
+    endif()
+
     add_library(chuying_gnugo SHARED ${CMAKE_CURRENT_LIST_DIR}/src/gnugo_bridge.cpp)
     # gnugo.h 会连带包含 engine/board.h -> sgf/sgftree.h、utils/winsocket.h 等，
     # 因此四个源码目录都要在包含路径上；再加 CMake 生成 config.h 的目录。
@@ -216,6 +253,10 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
         engine patterns sgf utils)
     if(CHUYING_WIN_STATIC_LINK)
         target_link_options(chuying_gnugo PRIVATE ${CHUYING_WIN_STATIC_LINK})
+    endif()
+    # macOS: SHARED 库允许未定义符号（否则 weak 钩子在 ld64 下仍会报错）
+    if(APPLE)
+        target_link_options(chuying_gnugo PRIVATE "-undefined" "dynamic_lookup")
     endif()
     set_target_properties(chuying_gnugo PROPERTIES PREFIX "")
 endif()
