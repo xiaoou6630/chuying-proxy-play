@@ -1,18 +1,72 @@
-# JNI 进程内引擎库（chuying_stockfish/pikafish/rapfi/gnugo）三平台编译。
-# 2.1 起 native/ 源码随发布树分发，因此在任意分支上**手动触发**即可复现构建。
-# 只保留 workflow_dispatch：push 不再自动编译（一次三平台构建约 10 分钟，日常提交不需要）。
-# 产物 90 天过期。
+# 只做一件事：编译四个引擎的 JNI 原生库（三平台），产出可下载的产物。
+#
+# ⚠️ 分工：**本 workflow 不构建 jar**。jar 由本地 `gradlew build` 打包，
+#    本 workflow 只负责产出 `src/main/resources/engines/` 需要的那几个 .dll/.so/.dylib。
+#
+# ⚠️ 临时分支约定：本 workflow 只在 `ci-tmp-*` 临时分支上跑。
+#   * 手动触发时若不在临时分支，会先自动创建 `ci-tmp-<run_id>` 并 checkout；
+#   * 编译完成后由 cleanup job 删除该临时分支（无论成功失败）；
+#   * 想保留分支调试时，触发时勾选 keep_branch。
+#
+# 产物：engines-unified（三平台原生库 + 一份共享权重），30 天过期。
 name: native-build
 
 on:
   workflow_dispatch:
+    inputs:
+      keep_branch:
+        description: '保留临时分支（调试用，默认删除）'
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write   # 需要创建/删除临时分支
+
+concurrency:
+  group: native-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # ------------------------------------------------------------------
+  # 0. 建临时分支
+  # ------------------------------------------------------------------
+  prepare:
+    name: prepare-temp-branch
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.mk.outputs.branch }}
+      created: ${{ steps.mk.outputs.created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create temp branch
+        id: mk
+        run: |
+          set -euo pipefail
+          SRC="${GITHUB_REF_NAME}"
+          if [[ "$SRC" == ci-tmp-* ]]; then
+            echo "已在临时分支 $SRC 上，直接复用"
+            echo "branch=$SRC"    >> "$GITHUB_OUTPUT"
+            echo "created=false"  >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BRANCH="ci-tmp-${GITHUB_RUN_ID}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git push -u origin "$BRANCH"
+          echo "已创建临时分支 $BRANCH（源 $SRC）"
+          echo "branch=$BRANCH"   >> "$GITHUB_OUTPUT"
+          echo "created=true"     >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------
+  # 1. 三平台编译原生库
+  # ------------------------------------------------------------------
   build:
     name: native-${{ matrix.platform }}
+    needs: prepare
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
@@ -24,6 +78,8 @@ jobs:
           - { platform: macos,   os: macos-latest }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.branch }}
 
       # JNI headers + smoke test JVM
       - uses: actions/setup-java@v4
@@ -97,3 +153,93 @@ jobs:
         run: bash .github/scripts/smoke_test.sh ${{ matrix.platform }} gnugo
         shell: bash
 
+  # ------------------------------------------------------------------
+  # 2. 合并三平台 -> 一棵可直接解压进 src/main/resources/engines/ 的目录树
+  #    （只整理文件，不构建 jar —— jar 在本地打）
+  # ------------------------------------------------------------------
+  merge:
+    name: merge-all-platforms
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.branch }}
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: engines-native-*
+          path: native_all
+
+      - name: Assemble unified engine tree
+        run: |
+          set -euo pipefail
+          mkdir -p unified/shared/stockfish unified/shared/rapfi
+          for d in native_all/engines-native-*/; do
+            plat="$(basename "$d")"; plat="${plat#engines-native-}"
+            case "$plat" in
+              windows) dest=windows-x86_64 ;;
+              linux)   dest=linux-x86_64 ;;
+              macos)   dest=macos-universal ;;
+              *) echo "skip unknown $plat"; continue ;;
+            esac
+            mkdir -p "unified/$dest"
+            find "$d" -maxdepth 1 -type f \( -name 'chuying_*' -o -name 'BUILD_INFO.txt' \) \
+              -exec cp {} "unified/$dest/" \;
+            echo "== $dest"; ls -la "unified/$dest"
+          done
+
+          # 权重三平台完全相同，只保留一份
+          first_nets="$(ls -d native_all/engines-native-*/nets 2>/dev/null | head -1 || true)"
+          if [ -n "$first_nets" ]; then
+            find "$first_nets" -maxdepth 1 -name 'nn-*.nnue' -exec cp {} unified/shared/stockfish/ \;
+            [ -f "$first_nets/pikafish.nnue" ] && cp "$first_nets/pikafish.nnue" unified/shared/
+          fi
+          echo "== shared"; ls -laR unified/shared
+
+      - name: Verify every platform has every library
+        run: |
+          set -euo pipefail
+          fail=0
+          for plat in windows-x86_64 linux-x86_64 macos-universal; do
+            for eng in stockfish pikafish rapfi gnugo; do
+              f=$(ls unified/$plat/chuying_$eng.* 2>/dev/null | head -1 || true)
+              [ -n "$f" ] || { echo "::error::missing $eng for $plat"; fail=1; }
+            done
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "all 3 platforms x 4 engines present"
+
+      - name: Check total size
+        run: |
+          du -sh unified
+          du -sh unified/* || true
+
+      - name: Upload unified engines
+        uses: actions/upload-artifact@v4
+        with:
+          name: engines-unified
+          path: unified/
+          if-no-files-found: error
+          retention-days: 30
+
+  # ------------------------------------------------------------------
+  # 3. 删除临时分支（无论成败）
+  # ------------------------------------------------------------------
+  cleanup:
+    name: delete-temp-branch
+    needs: [prepare, build, merge]
+    if: always() && needs.prepare.outputs.created == 'true' && inputs.keep_branch == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete temp branch
+        run: |
+          set -euo pipefail
+          BRANCH="${{ needs.prepare.outputs.branch }}"
+          echo "删除临时分支 $BRANCH"
+          git push origin --delete "$BRANCH" || echo "（分支已不存在，忽略）"

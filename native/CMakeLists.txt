@@ -51,12 +51,15 @@ endif()
 include_directories("$ENV{JAVA_HOME}/include" "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
 
 # Platform folder name, must match EngineExtractor.platform() in the mod.
+# 3.0 起一个 jar 通吃所有系统，目录名带架构（macOS 发 universal 二进制，故不带架构）。
 if(WIN32)
-    set(CHUYING_PLATFORM windows)
+    set(CHUYING_PLATFORM "windows-x86_64")
 elseif(APPLE)
-    set(CHUYING_PLATFORM macos)
+    set(CHUYING_PLATFORM "macos-universal")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "(aarch64)|(arm64)|(ARM64)")
+    set(CHUYING_PLATFORM "linux-arm64")
 else()
-    set(CHUYING_PLATFORM linux)
+    set(CHUYING_PLATFORM "linux-x86_64")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -107,6 +110,14 @@ chuying_bridge(chuying_stockfish
     JNI_DEFINE CHUYING_ENGINE_WCHESS
     SOURCES ${SF_SRCS}
     INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/engines/stockfish/src)
+# Stockfish 17.1 默认用 INCBIN 把 75 MB NNUE 编进二进制。三平台各编一份就是 225 MB 纯重复，
+# 而且 MSVC 不认 INCBIN 会静默失效（见 build_native.sh 注释）。
+# 关掉内嵌后，权重由 Java 侧 setoption name EvalFile / EvalFileSmall 指向解压出的文件，
+# 单库从 76 MB 降到约 1 MB，三平台共用同一份权重。
+target_compile_definitions(chuying_stockfish PRIVATE NNUE_EMBEDDING_OFF)
+# 让 Stockfish 在找不到 EvalFile 时还能退到游戏目录下的解压位置
+target_compile_definitions(chuying_stockfish PRIVATE
+    DEFAULT_NNUE_DIRECTORY="config/chuying/engines/${CHUYING_PLATFORM}/stockfish")
 
 chuying_bridge(chuying_pikafish
     JNI_DEFINE CHUYING_ENGINE_CCHESS

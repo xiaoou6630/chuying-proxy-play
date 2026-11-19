@@ -25,10 +25,17 @@ javac -d out ../../src/main/java/com/chuying/engine/CChessNativeBridge.java ../.
 
 # Pikafish loads pikafish.nnue at runtime and refuses to initialise without it, so
 # drop the net we downloaded for the build next to the test (the mod ships it in
-# the jar). Stockfish embeds its nets, nothing to do there.
+# the jar). Stockfish 3.0 builds with NNUE_EMBEDDING_OFF: its two nets are NOT in
+# the binary either, so copy them too and pass EvalFile/EvalFileSmall explicitly
+# (exactly what EngineManager.wchess() does at runtime).
 if [ -f "$ROOT/native/engines/pikafish/src/pikafish.nnue" ]; then
     cp "$ROOT/native/engines/pikafish/src/pikafish.nnue" ./pikafish.nnue
 fi
+mkdir -p ./stockfish
+for net in "$ROOT"/native/engines/stockfish/src/*.nnue; do
+    [ -f "$net" ] && cp "$net" ./stockfish/
+done
+ls -la ./stockfish/ 2>/dev/null || true
 
 run_one() { # engine strict
     local engine="$1" strict="$2" rc=0

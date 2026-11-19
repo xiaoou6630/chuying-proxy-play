@@ -3,6 +3,11 @@
 # Steps: clone engine sources -> rename main() -> compile sources directly
 # into chuying_<engine> shared libs alongside the bridge (no engine CMake).
 # No OS process is spawned; engines run in-process via redirected streams.
+#
+# 3.0: one jar for every OS. macOS builds a UNIVERSAL binary (arm64 + x86_64)
+# so Intel Macs stop getting UnsatisfiedLinkError; the platform directory name
+# is os-arch (macos-universal / windows-x86_64 / linux-x86_64) to match
+# EngineExtractor.platform().
 # Usage: bash .github/scripts/build_native.sh <windows|linux|macos>
 set -euo pipefail
 
@@ -12,6 +17,13 @@ cd "$ROOT"
 ENGINES="native/engines"
 mkdir -p "$ENGINES" native/dist
 
+# 平台目录名（与 CMakeLists 的 CHUYING_PLATFORM 一致）
+case "$PLATFORM" in
+    windows) PLAT_DIR="windows-x86_64" ;;
+    linux)   PLAT_DIR="linux-x86_64" ;;
+    macos)   PLAT_DIR="macos-universal" ;;
+    *) echo "ERROR: unknown platform $PLATFORM"; exit 1 ;;
+esac
 log() { echo "==> $*"; }
 
 # portable in-place sed: GNU needs -i, BSD (macOS) needs -i ''
@@ -284,10 +296,15 @@ CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
 # Rapfi: lock SIMD for portability (its own CMake auto-detects host with -march=native).
 # SSE x86 only; on ARM everything off (POC correctness first).
 if [ "$PLATFORM" = "macos" ]; then
+    # 3.0: UNIVERSAL binary — arm64 (Apple Silicon) + x86_64 (Intel).
+    # 之前只编 arm64（macos-latest 是 arm64 runner），Intel Mac 加载必 UnsatisfiedLinkError。
+    # Rapfi 的 SIMD 在两种架构下语义不同（x86 是 SSE、arm64 是 NEON），
+    # universal 里无法同时打开，因此全部关闭，走标量路径（棋力损失可忽略）。
     CMAKE_ARGS+=(-DUSE_SSE=OFF -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
                  -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
                  -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
-                 -DCMAKE_OSX_ARCHITECTURES=arm64)
+                 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+                 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
 else
     CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
                  -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
@@ -338,11 +355,38 @@ case "$PLATFORM" in
 esac
 [ -n "$(ls native/dist/chuying_* 2>/dev/null)" ] || { log "ERROR: no chuying_* outputs"; exit 1; }
 
+# macOS: verify both slices actually made it into every dylib. A silent
+# arm64-only build is exactly the bug this fixes, so fail loudly instead.
+if [ "$PLATFORM" = "macos" ]; then
+    log "verifying universal (arm64 + x86_64) slices"
+    for f in native/dist/chuying_*.dylib; do
+        archs="$(lipo -archs "$f" 2>/dev/null || echo '?')"
+        echo "  $(basename "$f"): $archs"
+        case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) log "ERROR: $f is not universal (archs=$archs)"; exit 1 ;;
+        esac
+    done
+fi
+
 log "stripping symbols"
 case "$PLATFORM" in
+    # strip -x on a universal binary keeps both slices (strip understands fat files)
     macos) find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip -x {} \; || true ;;
     *)     find native/dist -maxdepth 1 -type f -name 'chuying_*' -exec strip --strip-unneeded {} \; || true ;;
 esac
+
+# Re-verify after strip: some strip builds silently drop slices.
+if [ "$PLATFORM" = "macos" ]; then
+    for f in native/dist/chuying_*.dylib; do
+        archs="$(lipo -archs "$f" 2>/dev/null || echo '?')"
+        case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) ;;
+            *) log "ERROR: $f lost a slice during strip (archs=$archs)"; exit 1 ;;
+        esac
+    done
+    log "universal slices intact after strip"
+fi
 
 # The shipped library must not need the MinGW runtime DLLs at load time: they are
 # absent both on the CI runners and on end users' machines, and a missing
@@ -363,14 +407,25 @@ fi
 ls -la native/dist/
 
 cat > native/dist/BUILD_INFO.txt <<EOF
-platform: $PLATFORM
+platform: $PLATFORM ($PLAT_DIR)
 built_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); NNUE nets embedded at build time
+stockfish: https://github.com/official-stockfish/Stockfish $SF_SHA (GPL-3.0); built with NNUE_EMBEDDING_OFF (nets loaded at runtime via EvalFile/EvalFileSmall)
+stockfish_big_net_sha256: $(sha256sum "$ENGINES/stockfish/src/nn-1c0000000000.nnue" 2>/dev/null | cut -d' ' -f1)
+stockfish_small_net_sha256: $(sha256sum "$ENGINES/stockfish/src/nn-37f18f62d772.nnue" 2>/dev/null | cut -d' ' -f1)
 pikafish:  https://github.com/official-pikafish/Pikafish $PF_SHA (GPL-3.0)
 pikafish_net_sha256: $(sha256sum "$ENGINES/pikafish/src/pikafish.nnue" 2>/dev/null | cut -d' ' -f1)
 rapfi:     https://github.com/dhbloo/rapfi $RF_SHA (GPL-3.0); built single-threaded (NO_MULTI_THREADING)
 gnugo:     https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz ($GNUG0_SHA) (GPL-3.0-or-later); driven via its C API, in-process
 bridge:    native/src (GPL-3.0), patched engine_main linkage, in-process streams
 EOF
+
+# 权重文件也放进 dist：CI 的打包 job 从这里取 shared/ 内容，避免三平台各下一遍
+if [ -d "$ENGINES/stockfish/src" ]; then
+    mkdir -p native/dist/nets
+    for net in "$ENGINES"/stockfish/src/*.nnue; do
+        [ -f "$net" ] && cp "$net" native/dist/nets/
+    done
+    [ -f "$ENGINES/pikafish/src/pikafish.nnue" ] && cp "$ENGINES/pikafish/src/pikafish.nnue" native/dist/nets/
+fi
 
 log "done"
