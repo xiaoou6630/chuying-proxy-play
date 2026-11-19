@@ -294,16 +294,21 @@ done
 # ---------------------------------------------------------------------------
 CMAKE_ARGS=(-S native -B native/build -DCMAKE_BUILD_TYPE=Release)
 # Rapfi: lock SIMD for portability (its own CMake auto-detects host with -march=native).
-# SSE x86 only; on ARM everything off (POC correctness first).
 if [ "$PLATFORM" = "macos" ]; then
     # 3.0: UNIVERSAL binary — arm64 (Apple Silicon) + x86_64 (Intel).
     # 之前只编 arm64（macos-latest 是 arm64 runner），Intel Mac 加载必 UnsatisfiedLinkError。
-    # Rapfi 的 SIMD 在两种架构下语义不同（x86 是 SSE、arm64 是 NEON），
-    # universal 里无法同时打开，因此全部关闭，走标量路径（棋力损失可忽略）。
+    #
+    # 注意：**不能**用 CMAKE_OSX_ARCHITECTURES="arm64;x86_64" 一次性编。
+    # Rapfi 的 eval/simdops.h 按编译宏选 NEON/SSE 类型，而 CMake 多架构构建时
+    # 宏只展开一次，结果 x86_64 分片也在编译 NEON 代码：
+    #   error: unknown type name 'float32x4_t'
+    #   error: use of undeclared identifier 'vld1q_s8'
+    # 正确做法：分两个架构各编一遍（各自带正确的 SIMD 开关），再用 lipo 合并。
+    # 合并逻辑在下面 "universal 合并" 一节，这里先编 arm64。
     CMAKE_ARGS+=(-DUSE_SSE=OFF -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
-                 -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+                 -DUSE_VNNI=OFF -DUSE_NEON=ON -DUSE_NEON_DOTPROD=OFF
                  -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
-                 -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+                 -DCMAKE_OSX_ARCHITECTURES=arm64
                  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
 else
     CMAKE_ARGS+=(-DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
@@ -346,13 +351,50 @@ case "$PLATFORM" in
 esac
 
 # ---------------------------------------------------------------------------
+# 3b. macOS: 再编一遍 x86_64，然后 lipo 合并成 universal
+#     （不能一次编两个架构，原因见上面 CMAKE_ARGS 处的注释）
+# ---------------------------------------------------------------------------
+if [ "$PLATFORM" = "macos" ]; then
+    ARM_DIR="native/build-arm64"
+    X86_DIR="native/build-x86_64"
+    log "macOS: 复制 arm64 产物到 $ARM_DIR"
+    rm -rf "$ARM_DIR"
+    cp -R native/build "$ARM_DIR"
+
+    log "macOS: 编译 x86_64 分片（USE_SSE=ON / USE_NEON=OFF）"
+    X86_ARGS=(-S native -B "$X86_DIR" -DCMAKE_BUILD_TYPE=Release
+              -DUSE_SSE=ON -DUSE_AVX2=OFF -DUSE_AVX512=OFF -DUSE_BMI2=OFF
+              -DUSE_VNNI=OFF -DUSE_NEON=OFF -DUSE_NEON_DOTPROD=OFF
+              -DUSE_WASM_SIMD=OFF -DUSE_WASM_SIMD_RELAXED=OFF
+              -DCMAKE_OSX_ARCHITECTURES=x86_64
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0)
+    cmake "${X86_ARGS[@]}"
+    cmake --build "$X86_DIR" --parallel
+
+    log "macOS: lipo 合并 arm64 + x86_64"
+    mkdir -p native/dist
+    for name in chuying_stockfish chuying_pikafish chuying_rapfi chuying_gnugo; do
+        a="$ARM_DIR/$name.dylib"
+        x="$X86_DIR/$name.dylib"
+        if [ -f "$a" ] && [ -f "$x" ]; then
+            lipo -create "$a" "$x" -output "native/dist/$name.dylib"
+            echo "  merged $name.dylib -> $(lipo -archs native/dist/$name.dylib)"
+        else
+            log "ERROR: 缺少分片 $name (arm=$([ -f "$a" ] && echo ok || echo missing) x86=$([ -f "$x" ] && echo ok || echo missing))"
+            exit 1
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
 # 4. Collect outputs, strip symbols, verify runtime dependencies
 # ---------------------------------------------------------------------------
-case "$PLATFORM" in
-    windows) find native/build -name 'chuying_*.dll'   -exec cp {} native/dist/ \; ;;
-    linux)   find native/build -name 'chuying_*.so'    -exec cp {} native/dist/ \; ;;
-    macos)   find native/build -name 'chuying_*.dylib' -exec cp {} native/dist/ \; ;;
-esac
+if [ "$PLATFORM" != "macos" ]; then
+    case "$PLATFORM" in
+        windows) find native/build -name 'chuying_*.dll' -exec cp {} native/dist/ \; ;;
+        linux)   find native/build -name 'chuying_*.so'  -exec cp {} native/dist/ \; ;;
+    esac
+fi
 [ -n "$(ls native/dist/chuying_* 2>/dev/null)" ] || { log "ERROR: no chuying_* outputs"; exit 1; }
 
 # macOS: verify both slices actually made it into every dylib. A silent
