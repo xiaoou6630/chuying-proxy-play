@@ -24,7 +24,10 @@ permissions:
 
 concurrency:
   group: native-build-${{ github.ref }}
-  cancel-in-progress: true
+  # 关掉自动取消：实测同分支连发两次时，正在排队的 macOS job 会被新 run 取消，
+  # 而 macOS runner 本来就要排队 10+ 分钟（startedAt=null、steps=[]、runner 为空，
+  # 即「从未分配到机器就被取消」）。宁可让旧 run 跑完，也不要丢掉 macOS。
+  cancel-in-progress: false
 
 jobs:
   # ------------------------------------------------------------------
@@ -160,6 +163,9 @@ jobs:
   merge:
     name: merge-all-platforms
     needs: [prepare, build]
+    # 即使某个平台失败也跑：能合几个算几个，缺哪个在下面明确报出来，
+    # 而不是整块 skipped 让人不知道到底缺了什么。
+    if: always() && needs.prepare.outputs.branch != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,11 +178,21 @@ jobs:
           pattern: engines-native-*
           path: native_all
 
+      - name: Report which platforms arrived
+        run: |
+          echo "=== 收到的平台 artifact ==="
+          if [ -d native_all ]; then
+            ls -la native_all/ || true
+          else
+            echo "（一个都没收到）"
+          fi
+
       - name: Assemble unified engine tree
         run: |
           set -euo pipefail
           mkdir -p unified/shared/stockfish unified/shared/rapfi
           for d in native_all/engines-native-*/; do
+            [ -d "$d" ] || continue
             plat="$(basename "$d")"; plat="${plat#engines-native-}"
             case "$plat" in
               windows) dest=windows-x86_64 ;;
@@ -203,12 +219,25 @@ jobs:
           set -euo pipefail
           fail=0
           for plat in windows-x86_64 linux-x86_64 macos-universal; do
+            if [ ! -d "unified/$plat" ]; then
+              echo "::error::$plat 整个平台缺失（该平台的 build job 没产出 artifact）"
+              fail=1
+              continue
+            fi
             for eng in stockfish pikafish rapfi gnugo; do
               f=$(ls unified/$plat/chuying_$eng.* 2>/dev/null | head -1 || true)
               [ -n "$f" ] || { echo "::error::missing $eng for $plat"; fail=1; }
             done
           done
-          [ "$fail" -eq 0 ] || exit 1
+          if [ "$fail" -ne 0 ]; then
+            echo ""
+            echo "=== 已到位的平台 ==="
+            ls -la unified/ || true
+            echo ""
+            echo "提示：macOS job 若 startedAt=null / steps=[] / runner 为空，"
+            echo "      说明 GitHub 的 macos-latest runner 没分配到就失败了，重跑一次通常就好。"
+            exit 1
+          fi
           echo "all 3 platforms x 4 engines present"
 
       - name: Check total size
