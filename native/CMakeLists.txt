@@ -206,6 +206,16 @@ if(EXISTS ${CHUYING_GNUG0_DIR}/CMakeLists.txt)
         "$ENV{JAVA_HOME}/include/${JNI_PLATFORM_DIR}")
     # GNU Go 的头文件按 C 声明，桥是 C++：HAVE_CONFIG_H 让它们读到 CMake 生成的 config.h
     target_compile_definitions(chuying_gnugo PRIVATE HAVE_CONFIG_H)
+    # chuying_gnugo_abortgo_exit() 由本库的 gnugo_bridge.cpp 定义，被 libengine.a
+    # 里的 printutils.c / reading.c / oracle.c 调用（CI 把它们的 abort() 换成了它）。
+    # 静态库里的未定义符号由同一次链接的 SHARED 库提供，正常能解析；但 MinGW 的
+    # 默认符号可见性在某些优化下会把「只被静态库引用」的符号当成死代码裁掉，
+    # 这里显式导出，确保三平台都能解析。
+    target_compile_definitions(chuying_gnugo PRIVATE CHUYING_GNUG0_ABORT_HOOK)
+    if(WIN32)
+        set_target_properties(chuying_gnugo PROPERTIES
+            WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    endif()
     # GNU Go 的静态库之间是循环依赖（engine <-> patterns，engine -> sgf），而它们的
     # CMakeLists 没有声明依赖，单遍扫描的 ld（Windows/MinGW 尤其明显）会报未定义符号
     # （实测：libengine.a(board.c.obj) undefined reference to sgftreeAddComment）。
