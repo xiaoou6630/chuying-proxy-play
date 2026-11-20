@@ -66,3 +66,6 @@ native/java-test/*.nnue
 native/java-test/stockfish/
 native/java-test/PathProbe.java
 native/java-test/SfProbe*.java
+
+# 构建/调试日志
+*.log

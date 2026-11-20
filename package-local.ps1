@@ -93,7 +93,7 @@ if ($SkipBuild) {
 
 # 打包
 Write-Host "`n==> gradlew build"
-$env:GRADLE_USER_HOME = 'E:\Gradle\user_home'
+$env:GRADLE_USER_HOME = if ($env:GRADLE_USER_HOME) { $env:GRADLE_USER_HOME } else { Join-Path $env:USERPROFILE '.gradle' }
 Push-Location $proj
 try {
     & .\gradlew.bat clean build --offline

@@ -173,9 +173,68 @@ public final class ShogiCompat {
 
             available = true;
             Chuying.LOGGER.info("[chuying] 检测到 tlm_shogi，将棋代打已启用");
+
+            // 诊断：确认 tlm_shogi 的 MaidPoiManagerMixin 是否真的把 jchess 加进了
+            // 女仆的「娱乐方块」POI 集合。如果这里显示 jchess 不在集合里，说明
+            // 那个 mixin 没生效（女仆永远找不到将棋棋盘 → 不会来坐）。
+            diagnoseJoyBlockPoi(loader);
         } catch (Throwable t) {
             available = false;
             Chuying.LOGGER.warn("[chuying] 未检测到 tlm_shogi（或版本不兼容），将棋代打已禁用：{}", t.toString());
+        }
+    }
+
+    /**
+     * 诊断：打印 {@code MaidPoiManager.getJoyBlock()} 的 POI 集合里有没有 jchess。
+     * <p>
+     * 这是判断「将棋女仆不来」根因的关键：tlm_shogi 靠一个 mixin 把
+     * {@code tlm_shogi:jchess} 的方块状态塞进 TLM 的 JOYS 集合，
+     * 如果 mixin 没生效，女仆的 {@code MaidBoardGameTask.findGameBlock}
+     * 就永远找不到将棋棋盘。
+     * <p>
+     * 全部反射 + catch Throwable：TLM 内部结构变化时只打日志，绝不影响启动。
+     */
+    private static void diagnoseJoyBlockPoi(ClassLoader loader) {
+        try {
+            Class<?> poiMgr = findClass(loader,
+                    "com.github.tartaricacid.touhoulittlemaid.entity.poi.MaidPoiManager");
+            if (poiMgr == null) {
+                Chuying.LOGGER.warn("[chuying][诊断] 找不到 MaidPoiManager，跳过 POI 检查");
+                return;
+            }
+            Object poiType = poiMgr.getMethod("getJoyBlock").invoke(null);
+            if (poiType == null) {
+                Chuying.LOGGER.warn("[chuying][诊断] getJoyBlock() 返回 null");
+                return;
+            }
+            java.util.Collection<?> states = (java.util.Collection<?>)
+                    poiType.getClass().getMethod("matchingStates").invoke(poiType);
+            int total = states == null ? 0 : states.size();
+            boolean hasShogi = false;
+            StringBuilder sample = new StringBuilder();
+            if (states != null) {
+                int shown = 0;
+                for (Object st : states) {
+                    String s = String.valueOf(st);
+                    if (s.contains("jchess")) {
+                        hasShogi = true;
+                    }
+                    if (shown < 5) {
+                        sample.append(s).append("; ");
+                        shown++;
+                    }
+                }
+            }
+            Chuying.LOGGER.info("[chuying][诊断] 女仆娱乐方块 POI 共 {} 个状态，含 jchess = {}",
+                    total, hasShogi);
+            Chuying.LOGGER.info("[chuying][诊断] POI 前几个状态: {}", sample);
+            if (!hasShogi) {
+                Chuying.LOGGER.warn("[chuying][诊断] ⚠ jchess 不在 POI 集合里 → tlm_shogi 的 "
+                        + "MaidPoiManagerMixin 未生效，女仆不会来将棋棋盘。"
+                        + "根因是它的 mixins.json 声明 JAVA_17 但用 Java 21 编译（class 65 > 61）。");
+            }
+        } catch (Throwable t) {
+            Chuying.LOGGER.warn("[chuying][诊断] POI 检查失败（不影响运行）: {}", t.toString());
         }
     }
 
