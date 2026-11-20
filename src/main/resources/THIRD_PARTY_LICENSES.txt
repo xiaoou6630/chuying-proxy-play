@@ -1,47 +1,115 @@
 THIRD PARTY LICENSES
 ====================
 
-Chuying Proxy Play（褚嬴代打）内置三个开源棋类引擎。自 2.0 起，三个引擎不再以独立
-可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、在游戏进程内运行**
-（stdin/stdout 被重定向到内存队列，不 spawn 任何 OS 进程）。
+本文件列出 Chuying Proxy Play（褚嬴代打）Forge 1.20.1 版分发物中涉及的**全部**
+第三方内容，以及本 mod 与它们之间的许可关系。分两类：
 
-1) Pikafish（中国象棋引擎）
+  A. 内置组件 —— 随 jar 一起分发（三个棋类引擎及其权重、内嵌库）
+  B. 前置/可选模组 —— 不随本 mod 分发，仅在运行时与它们互操作
+
+本 mod 本体以 GNU GPL-3.0-only 发布（见同目录 LICENSE）。
+
+
+================================================================================
+A. 内置组件（随 jar 分发）
+================================================================================
+
+自 2.0 起，引擎不再以独立可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、
+在游戏进程内运行**（stdin/stdout 被重定向到内存队列），不 spawn 任何 OS 进程。
+
+A-1) Pikafish（中国象棋引擎）
    Source:  https://github.com/official-pikafish/Pikafish
    License: GNU General Public License v3.0
    说明:    随 jar 分发的 chuying_pikafish 原生库由 Pikafish 源码 + 本 mod 的
             JNI 桥接层（native/src，同样 GPL-3.0-only）链接而成，构建期补丁见
             .github/scripts/build_native.sh（重命名 main()、屏蔽 Windows 下用进程
             命令行覆盖 argv 的行为）。
+   固定版本: 为保证引擎与权重配套，构建时锁定 commit
+            b562d6aeac5401879e973dc53ddb56053f07bb6a。
    权重:    随附的神经网络权重 pikafish.nnue 遵循 Pikafish 的 NNUE 许可 ——
-            仅限个人、非商业用途；任何商业使用需向 Pikafish 团队另行获取商业授权。
-            NNUE 许可全文见同目录 pikafish_NNUE_LICENSE.txt
+            **仅限个人、非商业用途**；任何商业使用需向 Pikafish 团队另行获取商业授权。
+            NNUE 许可全文见同目录 licenses/pikafish_NNUE_LICENSE.txt
 
-2) Stockfish（国际象棋引擎）
+A-2) Stockfish（国际象棋引擎）
    Source:  https://github.com/official-stockfish/Stockfish
    License: GNU General Public License v3.0
-   说明:    随 jar 分发的 chuying_stockfish 原生库链接 Stockfish 源码；两份 NNUE
-            权重（nn-1c0000000000 / nn-37f18f62d772）在构建期以 INCBIN 编入该库，
-            因此不需要额外权重文件。
+   说明:    随 jar 分发的 chuying_stockfish 原生库链接 Stockfish 源码（tag sf_17.1）。
+            两份 NNUE 权重（nn-1c0000000000 / nn-37f18f62d772）以独立文件随 jar 分发，
+            运行时由 Java 侧通过 UCI 的 "setoption name EvalFile / EvalFileSmall"
+            指向解压后的绝对路径加载。
+            （3.0 起编译时定义 NNUE_EMBEDDING_OFF，权重不再 INCBIN 编入二进制，
+            这样三个平台共用同一份权重文件，单库体积从约 76 MB 降到约 1 MB。）
+   权重许可: Stockfish 官方 NNUE 权重随 Stockfish 一同以 GPL-3.0 分发。
 
-3) Rapfi（五子棋/连珠引擎）
+A-3) Rapfi（五子棋/连珠引擎）
    Source:  https://github.com/dhbloo/rapfi
    License: GNU General Public License v3.0
-   说明:    随 jar 分发的 chuying_rapfi 原生库链接 Rapfi 源码，构建期关闭其
-            MULTI_THREADING（避免在 Windows 加载期初始化全局对象时创建线程而死锁）。
+   说明:    随 jar 分发的 chuying_rapfi 原生库链接 Rapfi 源码（tag 250615），构建期
+            关闭其 MULTI_THREADING（避免在 Windows 加载期初始化全局对象时创建线程而死锁）。
    模型:    随附的 model210901.bin / mix9svqfreestyle_bsmix.bin.lz4 来自 Rapfi
-            官方发布，遵循其仓库同样许可。
+            官方发布，遵循其仓库同样许可（GPL-3.0）。
 
-------------------------------------------------------------------------------
-GPL 合规说明（对应源码获取方式）
+   （Forge 1.20.1 版**不含围棋引擎**：围棋棋盘模组 TouhouGO 仅支持 NeoForge 1.21.1。）
 
-上述三个引擎均为 GNU GPL-3.0，本 mod 本体同样以 GPL-3.0-only 发布
+A-4) Cloth Config（通过 JarJar 内嵌）
+   Source:  https://github.com/shedaniel/cloth-config
+   License: GNU Lesser General Public License v3.0 (LGPL-3.0)
+   说明:    Forge 版用 JarJar 把 cloth-config-forge:11.1.106 内嵌进 jar，
+            玩家无需单独安装。LGPL 允许与 GPL 作品链接分发（GPL-3.0 §4/§5 明确允许），
+            不冲突。玩家若已安装其他版本的 cloth-config，Forge 会自动去重。
+   LGPL v3 完整文本：https://www.gnu.org/licenses/lgpl-3.0.txt
+
+
+================================================================================
+B. 前置 / 可选模组（不随本 mod 分发，仅运行时互操作）
+================================================================================
+
+本 mod 支持若干第三方模组，但**不分发、不复制、不修改它们的任何代码或素材**：
+未安装时本 mod 行为完全不受影响，它们只出现在 mods.toml 的 optional 依赖里。
+
+B-1) Touhou Little Maid（车万女仆，必需前置）
+   Source:  https://github.com/tartaricacid/TouhouLittleMaid
+            发布页: https://www.curseforge.com/minecraft/mc-mods/touhou-little-maid
+   License: **MIT / CC BY-NC-SA 4.0 双许可**（jar 内 mods.toml 的 license 字段原文）
+   说明:    本 mod 直接编译依赖 TLM 的 API（IBoardGameBlock、BlockGomoku、
+            TileEntityGomoku、MaidGomokuAI 等），并在运行时调用其公开方法。
+            本 mod **不打包** TLM 的任何 class 或资源；玩家需自行安装。
+   合规:    MIT 部分允许本 mod 自由链接与调用（保留其版权声明即可）。
+            CC BY-NC-SA 4.0 部分约束的是其**素材**（模型/贴图/音效），本 mod 未使用。
+            若本 mod 用于商业用途，需注意 TLM 的 NC 条款对其素材的限制。
+
+B-2) ChessPVP / 棋圣（车万女仆 PVP 附属，可选）
+   Source:  发布页 https://modrinth.com/mod/tlmcp-chesspvp
+   License: **All Rights Reserved**（jar 内 mods.toml 的 license 字段原文）
+   说明:    本 mod 通过反射读取它写在方块实体 NBT 里的 PVP 状态
+            （ChessPvpP1 / ChessPvpP2 / ChessPvpTurn），以判断「本客户端是哪一方、
+            现在轮到谁」。不调用它的任何方法，不分发它的任何字节。
+   ⚠ 注意:  其许可为 All Rights Reserved，因此：
+            a) 本 mod 的 PVP 联动功能要求玩家**自行安装** ChessPVP；
+            b) 不得把 ChessPVP 的文件打进任何再分发包；
+            c) 该功能仅为运行时互操作，不构成对其作品的复制或改编。
+            如需商用相关联动，请联系其作者。
+
+
+================================================================================
+C. GPL 合规说明（对应源码获取方式）
+================================================================================
+
+上述 A 组引擎均为 GNU GPL-3.0，本 mod 本体同样以 GPL-3.0-only 发布
 （见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
 
 GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
-  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库按固定 commit 拉取；
-  - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录三个引擎的仓库地址与
-    精确 commit hash（下载页的 Release 说明中同样列出）；
+
+  - 引擎源码不打进 jar（体积原因），而是在构建时从上游仓库按**固定版本**拉取：
+      * Stockfish: tag sf_17.1
+      * Pikafish:  commit b562d6aeac5401879e973dc53ddb56053f07bb6a
+      * Rapfi:     tag 250615
+  - 每个发布版本的构建产物内附带 engines/<platform>/BUILD_INFO.txt，记录三个引擎的
+    仓库地址、精确 commit/tar sha256 与权重 sha256；
+  - 本 mod 自身的修改（JNI 桥接层 native/src/*.cpp 与 native/CMakeLists.txt）
+    **随仓库与发布 tag 一同分发**；
   - 构建脚本 .github/scripts/build_native.sh 完整公开了源码所打的全部补丁，
     据此可复现出与本 mod 完全一致的引擎二进制。
 
 GNU GPL v3 完整文本：https://www.gnu.org/licenses/gpl-3.0.txt
+GNU LGPL v3 完整文本：https://www.gnu.org/licenses/lgpl-3.0.txt
