@@ -1,14 +1,19 @@
 package com.chuying.engine;
 
+import com.chuying.Chuying;
 import com.chuying.Config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 三个棋种的原生引擎实例管理（进程内运行、懒加载、常驻、退出时统一关闭）。
+ * 进程内引擎实例管理（懒加载、常驻、退出时统一关闭）。
+ * <p>
+ * 引擎的<b>声明</b>在 {@link EngineRegistry}，这里只负责<b>实例化</b>：
+ * 按 {@link EngineSpec} 取出库路径与数据文件，交给对应的包装类。
  * <p>
  * 2.0 起引擎以 JNI 原生库形式随 jar 分发（零子进程），不再支持外置 exe 路径配置。
+ * 3.0 起一个 jar 通吃所有系统（见 {@link EngineExtractor}）。
  */
 public final class EngineManager {
     static {
@@ -23,47 +28,61 @@ public final class EngineManager {
     private EngineManager() {
     }
 
-    /** 中国象棋（皮卡鱼，进程内） */
+    /** 中国象棋（皮卡鱼，进程内 UCI） */
     public static synchronized NativeUciEngine cchess() {
         if (cchess == null) {
-            String lib = EngineExtractor.nativeLibPath("chuying_pikafish");
+            String lib = libPath(EngineRegistry.CCHESS);
             if (lib == null) {
                 return null;
             }
             Map<String, String> options = new LinkedHashMap<>();
-            String nnue = EngineExtractor.dataFilePath("pikafish.nnue");
+            // Pikafish 的权重是必需项，路径不对会直接 std::exit 杀掉 JVM，必须显式下发
+            String nnue = dataPath(EngineRegistry.CCHESS, "pikafish.nnue");
             if (nnue != null) {
                 options.put("EvalFile", nnue);
             }
-            cchess = new NativeUciEngine(lib, options);
+            cchess = new NativeUciEngine(lib, options, false);
         }
         return cchess;
     }
 
     /**
-     * 国际象棋（Stockfish，进程内）；附带避和强度配置透传。
+     * 国际象棋（Stockfish，进程内 UCI）；附带避和强度配置透传。
      * <p>
-     * Stockfish 的两份 NNUE 权重在 CI 构建时已用 INCBIN 编进原生库（默认
-     * EvalFile/EvalFileSmall 即内嵌权重），因此不再解压/下发权重文件，
-     * 也不再随 jar 重复打包一份（省 78MB）。
+     * 3.0 起 CI 用 {@code -DNNUE_EMBEDDING_OFF} 编译，权重不再内嵌，
+     * 因此这里必须显式下发 EvalFile / EvalFileSmall 两个路径
+     * （Stockfish 17.1 有大小两个网，缺一不可）。
      */
     public static synchronized NativeUciEngine wchess() {
         if (wchess == null) {
-            String lib = EngineExtractor.nativeLibPath("chuying_stockfish");
+            String lib = libPath(EngineRegistry.WCHESS);
             if (lib == null) {
                 return null;
             }
-            wchess = new NativeUciEngine(lib, Map.of(), true);
+            Map<String, String> options = new LinkedHashMap<>();
+            String big = dataPath(EngineRegistry.WCHESS, "stockfish/nn-1c0000000000.nnue");
+            String small = dataPath(EngineRegistry.WCHESS, "stockfish/nn-37f18f62d772.nnue");
+            if (big != null) {
+                options.put("EvalFile", big);
+            }
+            if (small != null) {
+                options.put("EvalFileSmall", small);
+            }
+            if (big == null || small == null) {
+                Chuying.warnOnce("stockfish-nets", "Stockfish 权重缺失，引擎将无法评估局面（棋力大幅下降）");
+            }
+            wchess = new NativeUciEngine(lib, options, true);
         }
         // 避和强度（仅国象 Stockfish 支持）：让引擎主动求胜、避免强制和棋，配置实时生效
+        // 注意：Fabric 版的 Config 是普通静态字段（不是 Forge 的 ConfigValue），故直接取。
         wchess.setAggressiveness(Config.avoidDraw.aggressiveness);
         return wchess;
     }
 
-    /** 五子棋（Rapfi，进程内） */
+    /** 五子棋（Rapfi，进程内 pbrain） */
     public static synchronized NativeGomokuEngine gomoku() {
         if (gomoku == null) {
-            String lib = EngineExtractor.nativeLibPath("chuying_rapfi");
+            String lib = libPath(EngineRegistry.GOMOKU);
             String config = EngineExtractor.rapfiConfigPath();
             if (lib == null || config == null) {
                 return null;
@@ -71,6 +90,18 @@ public final class EngineManager {
             gomoku = new NativeGomokuEngine(lib, config);
         }
         return gomoku;
+    }
+
+    // ------------------------------------------------------------------
+    // 内部工具
+    // ------------------------------------------------------------------
+
+    private static String libPath(EngineSpec spec) {
+        return EngineExtractor.nativeLibPath(spec.libBase());
+    }
+
+    private static String dataPath(EngineSpec spec, String rel) {
+        return EngineExtractor.dataFilePath(rel);
     }
 
     public static synchronized void shutdown() {
@@ -86,5 +117,5 @@ public final class EngineManager {
             gomoku.close();
             gomoku = null;
         }
-    }
+            }
 }

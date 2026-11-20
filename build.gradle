@@ -68,44 +68,66 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-// ---- 三平台分发包：一次 build 产出 windows/linux/macos 三个 jar，各自只带本平台引擎 ----
-def enginePlatforms = ['windows', 'linux', 'macos']
+// ---- 3.0：一个 jar 通吃所有系统（与 NeoForge/Forge 3.0 保持一致）----
+// 不再产出 windows/linux/macos 三个 jar。jar 内引擎目录按 os-arch 分层：
+//   engines/windows-x86_64/  engines/linux-x86_64/  engines/macos-universal/
+//   engines/shared/          <- 权重只放一份（三平台共用）
+// 运行时 EngineExtractor 只解压当前系统需要的那一份。
+def engineRoot = file('src/main/resources/engines')
 
-// 主 jar 不打包引擎，引擎由各平台 jar 携带，避免重复与体积膨胀
+// 主 jar 不打包引擎（引擎由下面的 universalJar 携带）
 tasks.named('jar', Jar).configure {
     exclude 'engines/**'
 }
 
-enginePlatforms.each { plat ->
-    tasks.register("jar${plat.capitalize()}", Jar) {
-        group = 'build'
-        // 产物命名：Chuying.Proxy.Play<版本>-Fabric-<MC版本>-<系统>.jar
-        // （带加载器与 MC 版本，方便和 Forge/NeoForge 版本区分）
-        archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}-${plat}.jar"
+tasks.register('universalJar', Jar) {
+    group = 'build'
+    archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}-universal.jar"
 
-        dependsOn tasks.named('remapJar')
+    dependsOn tasks.named('remapJar')
 
-        // 复用 remapJar 的全部内容（class、资源、fabric.mod.json、mixins、内嵌 cloth-config 等）
-        // 引擎不随 remapJar（含三平台全部），改为下方按平台单独打入
-        from(zipTree(tasks.named('remapJar').flatMap { it.archiveFile })) {
-            exclude 'META-INF/MANIFEST.MF'
-            exclude 'engines/**'
-        }
+    // 复用 remapJar 的全部内容（class、资源、fabric.mod.json、mixins、内嵌 cloth-config 等）
+    from(zipTree(tasks.named('remapJar').flatMap { it.archiveFile })) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'engines/**'
+    }
 
-        // 打入本平台引擎 + 三平台共享资源（目录缺失时自动跳过）
-        // 2.0 起引擎为 JNI 原生库（.dll/.so/.dylib），jar 内直接带平台后缀，
-        // 权重等数据文件放 engines/shared/（只打包一份）。
-        def platDir = file("src/main/resources/engines/${plat}")
-        def sharedDir = file('src/main/resources/engines/shared')
-        if (platDir.exists()) {
-            from(platDir) { into "engines/${plat}" }
-        }
-        if (sharedDir.exists()) {
-            from(sharedDir) { into 'engines/shared' }
-        }
+    // 全部平台引擎 + 共享权重（目录缺失时自动跳过）
+    if (engineRoot.exists()) {
+        from(engineRoot) { into 'engines' }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// 便捷任务：只打当前开发机平台的瘦 jar（本地快速测试用，不用于发布）
+tasks.register('jarLocalOnly', Jar) {
+    group = 'build'
+    description = '只含本机平台引擎的瘦 jar，用于本地快速测试'
+    archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}-local.jar"
+
+    dependsOn tasks.named('remapJar')
+    from(zipTree(tasks.named('remapJar').flatMap { it.archiveFile })) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'engines/**'
+    }
+    def localPlat = {
+        def os = System.getProperty('os.name').toLowerCase()
+        def arch = System.getProperty('os.arch').toLowerCase()
+        def a = (arch.contains('aarch64') || arch.contains('arm64')) ? 'arm64' : 'x86_64'
+        if (os.contains('win')) return "windows-${a}"
+        if (os.contains('mac') || os.contains('darwin')) return 'macos-universal'
+        return "linux-${a}"
+    }()
+    def platDir = new File(engineRoot, localPlat)
+    def sharedDir = new File(engineRoot, 'shared')
+    if (platDir.exists()) {
+        from(platDir) { into "engines/${localPlat}" }
+    }
+    if (sharedDir.exists()) {
+        from(sharedDir) { into 'engines/shared' }
     }
 }
 
 tasks.named('assemble').configure {
-    dependsOn enginePlatforms.collect { "jar${it.capitalize()}" }
+    dependsOn 'universalJar'
 }

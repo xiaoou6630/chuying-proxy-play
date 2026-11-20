@@ -60,3 +60,6 @@ native/java-test/out/
 native/java-test/pikafish.nnue
 
 native_artifacts/
+
+# 构建/调试日志
+*.log
