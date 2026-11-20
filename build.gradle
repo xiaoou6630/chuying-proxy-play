@@ -82,7 +82,7 @@ tasks.named('jar', Jar).configure {
 
 tasks.register('universalJar', Jar) {
     group = 'build'
-    archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}-universal.jar"
+    archiveFileName = "Chuying.Proxy.Play${mod_version}-Fabric-${minecraft_version}.jar"
 
     dependsOn tasks.named('remapJar')
 
