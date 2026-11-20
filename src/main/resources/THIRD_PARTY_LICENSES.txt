@@ -1,41 +1,56 @@
 THIRD PARTY LICENSES
 ====================
 
-Chuying Proxy Play（褚嬴代打）内置四个开源棋类引擎。自 2.0 起，引擎不再以独立
-可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、在游戏进程内运行**
-（前三个引擎的 stdin/stdout 被重定向到内存队列；围棋引擎直接调用其 C API，
-连文本协议都不走），不 spawn 任何 OS 进程。
+本文件列出 Chuying Proxy Play（褚嬴代打）分发物中涉及的**全部**第三方内容，
+以及本 mod 与它们之间的许可关系。分两类：
 
-1) Pikafish（中国象棋引擎）
+  A. 内置组件 —— 随 jar 一起分发（四个棋类引擎及其权重、内嵌库）
+  B. 前置/可选模组 —— 不随本 mod 分发，仅在运行时与它们互操作
+
+本 mod 本体以 GNU GPL-3.0-only 发布（见同目录 LICENSE）。
+
+
+================================================================================
+A. 内置组件（随 jar 分发）
+================================================================================
+
+自 2.0 起，引擎不再以独立可执行文件（子进程）方式调用，而是**编译成 JNI 原生库、
+在游戏进程内运行**（前三个引擎的 stdin/stdout 被重定向到内存队列；围棋引擎直接
+调用其 C API，连文本协议都不走），不 spawn 任何 OS 进程。
+
+A-1) Pikafish（中国象棋引擎）
    Source:  https://github.com/official-pikafish/Pikafish
    License: GNU General Public License v3.0
    说明:    随 jar 分发的 chuying_pikafish 原生库由 Pikafish 源码 + 本 mod 的
             JNI 桥接层（native/src，同样 GPL-3.0-only）链接而成，构建期补丁见
             .github/scripts/build_native.sh（重命名 main()、屏蔽 Windows 下用进程
             命令行覆盖 argv 的行为）。
+   固定版本: 为保证引擎与权重配套，构建时锁定 commit
+            b562d6aeac5401879e973dc53ddb56053f07bb6a。
    权重:    随附的神经网络权重 pikafish.nnue 遵循 Pikafish 的 NNUE 许可 ——
-            仅限个人、非商业用途；任何商业使用需向 Pikafish 团队另行获取商业授权。
+            **仅限个人、非商业用途**；任何商业使用需向 Pikafish 团队另行获取商业授权。
             NNUE 许可全文见同目录 pikafish_NNUE_LICENSE.txt
 
-2) Stockfish（国际象棋引擎）
+A-2) Stockfish（国际象棋引擎）
    Source:  https://github.com/official-stockfish/Stockfish
    License: GNU General Public License v3.0
-   说明:    随 jar 分发的 chuying_stockfish 原生库链接 Stockfish 源码；两份 NNUE
-            权重（nn-1c0000000000 / nn-37f18f62d772）以独立文件随 jar 分发，
+   说明:    随 jar 分发的 chuying_stockfish 原生库链接 Stockfish 源码（tag sf_17.1）。
+            两份 NNUE 权重（nn-1c0000000000 / nn-37f18f62d772）以独立文件随 jar 分发，
             运行时由 Java 侧通过 UCI 的 "setoption name EvalFile / EvalFileSmall"
             指向解压后的绝对路径加载。
             （3.0 起编译时定义 NNUE_EMBEDDING_OFF，权重不再 INCBIN 编入二进制，
             这样三个平台共用同一份权重文件，单库体积从约 76 MB 降到约 1 MB。）
+   权重许可: Stockfish 官方 NNUE 权重随 Stockfish 一同以 GPL-3.0 分发。
 
-3) Rapfi（五子棋/连珠引擎）
+A-3) Rapfi（五子棋/连珠引擎）
    Source:  https://github.com/dhbloo/rapfi
    License: GNU General Public License v3.0
-   说明:    随 jar 分发的 chuying_rapfi 原生库链接 Rapfi 源码，构建期关闭其
-            MULTI_THREADING（避免在 Windows 加载期初始化全局对象时创建线程而死锁）。
+   说明:    随 jar 分发的 chuying_rapfi 原生库链接 Rapfi 源码（tag 250615），构建期
+            关闭其 MULTI_THREADING（避免在 Windows 加载期初始化全局对象时创建线程而死锁）。
    模型:    随附的 model210901.bin / mix9svqfreestyle_bsmix.bin.lz4 来自 Rapfi
-            官方发布，遵循其仓库同样许可。
+            官方发布，遵循其仓库同样许可（GPL-3.0）。
 
-4) GNU Go（围棋引擎）
+A-4) GNU Go（围棋引擎）
    Source:  https://ftp.gnu.org/gnu/gnugo/gnugo-3.8.tar.gz （GNU Go 3.8 稳定版；
             官网 https://www.gnu.org/software/gnugo/）
             tar sha256: da68d7a65f44dcf6ce6e4e630b6f6dd9897249d34425920bfdd4e07ff1866a72
@@ -53,50 +68,87 @@ Chuying Proxy Play（褚嬴代打）内置四个开源棋类引擎。自 2.0 起
              b) patterns/CMakeLists.txt：GET_TARGET_PROPERTY(... LOCATION) 改为生成器
                 表达式 $<TARGET_FILE:...>（CMake >= 3 的 CMP0026 禁止配置期读取 LOCATION）；
              c) 用 -fcommon 等开关适配现代编译器（GCC 10+/Clang 11+ 默认 -fno-common）；
-             d) **三处 GNU Go 3.8 自身缺陷修复**（Linux 只是靠未初始化内存恰好为 0 侥幸
+             d) **GNU Go 3.8 自身缺陷修复**（Linux 只是靠未初始化内存恰好为 0 侥幸
                 通过，macOS/arm64 必现 abort；用 execinfo 调用栈定位到崩点）:
                   1. engine/combination.c: aa_init_moves() 只设 attacks[0].move 哨兵，
                      target[] 其余槽位是未初始化栈内存，会被 aa_sort_moves()/get_aa_value()
                      当作目标位置使用 -> 改为整数组初始化；
-                  2. utils/gg_utils.c: gg_sort() 没有 nel < 2 保护，nel == 0 时
-                     end = base + width * (nel - 1) 会 size_t 下溢 -> 加早退；
-                  3. engine/board.c: countlib/countstones/findstones 收到非法位置时改为
-                     返回 0（进程内引擎不能让 abort 连坐杀掉整个 Minecraft JVM）。
+                  2. utils/gg_utils.c: gg_sort() 在 nel == 0 时 end = base + width*(nel-1)
+                     造成 size_t 下溢 -> 加 nel < 2 保护；
+                  3. engine/board.c: countlib/countstones/findstones 收到非法位置时
+                     abortgo() 直接 abort，会连同 JVM 一起杀掉 -> 改为返回 0；
+             e) **abort() -> longjmp**：进程内引擎里 abort() 会杀死整个 JVM（实测第 224 手、
+                棋盘接近下满时踩 board.c 的 ON_BOARD1(PASS) 断言）。构建期把
+                engine/printutils.c(abortgo)、engine/reading.c(3 处)、engine/oracle.c
+                的 abort() 全部替换为桥接层提供的 chuying_gnugo_abortgo_exit()，后者
+                longjmp 回 nativeGenmove 的 setjmp 点，使「引擎内部踩 bug」退化为
+                「这一手算不出来」（返回 -3，Java 侧跳过）。该符号声明为 weak，
+                以便 GNU Go 的构建期小工具（joseki/uncompress_fuseki 等）也能链接。
+   注意:    这些补丁**改变了 GNU Go 的行为**（不再 abort），属于 GPL 允许的修改；
+            修改后的完整源码可由上述 tar + 本仓库的构建脚本完整复现。
 
-------------------------------------------------------------------------------
-GPL 合规说明（对应源码获取方式）
+A-5) Cloth Config（仅 Forge 1.20.1 版，通过 JarJar 内嵌）
+   Source:  https://github.com/shedaniel/cloth-config
+   License: GNU Lesser General Public License v3.0 (LGPL-3.0)
+   说明:    Forge 版用 JarJar 把 cloth-config-forge 内嵌进 jar，玩家无需单独安装。
+            LGPL 允许与 GPL 作品链接分发（GPL-3.0 §4/§5 明确允许），不冲突。
+            cloth-config 源码：https://github.com/shedaniel/cloth-config
 
-上述四个引擎均为 GNU GPL（前三个 GPL-3.0，GNU Go 为 GPL-3.0-or-later），本 mod 本体
-同样以 GPL-3.0-only 发布（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
+A-6) MixinExtras（仅 NeoForge 1.21.1 版，运行时由 NeoForge 提供，未内嵌）
+   Source:  https://github.com/LlamaLad7/MixinExtras
+   License: MIT
+   说明:    本 mod 自身不内嵌它；tlm_shogi（可选依赖）使用其 @ModifyReturnValue，
+            NeoForge 21.1.240 已作为 game library 自带 mixinextras-neoforge。
 
-GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
-  - 对应源码落点：引擎源码本体取自上游（GNU Go = 上述官方 tar，sha256 已固定），
-    本 mod 的修改（JNI 桥接层 native/src/*.cpp、native/CMakeLists.txt）随本仓库公开，
-    构建期所打的全部补丁见 .github/scripts/build_native.sh —— 上游源码 + 本仓库的
-    桥接层与补丁脚本合起来即 GPLv3 意义上的 Corresponding Source，可从任意发布
-    tag（如 2.1）完整取到（2.1 起 native/ 追踪在发布树内）；
-  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库/官方 tar 包按固定
-    commit / 固定 sha256 拉取；
-  - 每个发布版本的构建产物内附带 BUILD_INFO.txt，记录四个引擎的仓库地址与
-    精确 commit hash / tar 包 sha256（下载页的 Release 说明中同样列出）；
-  - 构建脚本 .github/scripts/build_native.sh 完整公开了源码所打的全部补丁，
-    据此可复现出与本 mod 完全一致的引擎二进制。
 
-GNU GPL v3 完整文本：https://www.gnu.org/licenses/gpl-3.0.txt
-
-------------------------------------------------------------------------------
-可选依赖（仅运行时互操作，未随本 mod 分发）
+================================================================================
+B. 前置 / 可选模组（不随本 mod 分发，仅运行时互操作）
+================================================================================
 
 本 mod 支持若干第三方模组，但**不分发、不复制、不修改它们的任何代码或素材**：
-未安装时本 mod 行为完全不受影响，它们只出现在 mods.toml 的 optional 依赖里。
+未安装时本 mod 行为完全不受影响，它们只出现在 mods.toml / fabric.mod.json 的
+optional 依赖里。
 
-- TouhouGO（车万女仆：围棋棋盘，modid 由 AutoForge 生成，形如 touhou_go_board_*）
-  上游许可: 仓库 LICENSE 文件为 **CC0 1.0 Universal**（公共领域奉献），但 README 首行
-            声明"代码及美术素材均采用 CC BY-NC-SA 4.0"——上游自身两处不一致；
+B-1) Touhou Little Maid（车万女仆，必需前置 —— 三个版本都依赖）
+   Source:  https://github.com/tartaricacid/TouhouLittleMaid
+            发布页: https://www.curseforge.com/minecraft/mc-mods/touhou-little-maid
+   License: **MIT / CC BY-NC-SA 4.0 双许可**（jar 内 mods.toml 的 license 字段原文）
+   说明:    本 mod 直接编译依赖 TLM 的 API（IBoardGameBlock、BlockGomoku、
+            TileEntityGomoku、MaidGomokuAI 等），并在运行时调用其公开方法。
+            本 mod **不打包** TLM 的任何 class 或资源；玩家需自行安装。
+   合规:    MIT 部分允许本 mod 自由链接与调用（保留其版权声明即可）。
+            CC BY-NC-SA 4.0 部分约束的是其**素材**（模型/贴图/音效），本 mod 未使用。
+            若本 mod 用于商业用途，需注意 TLM 的 NC 条款对其素材的限制。
+   另注:    Fabric 版的 TLM 是第三方移植（touhoulittlemaid-fabric-0.8.2-forge1.5.3），
+            其许可同上；该移植版非官方，本 mod 不对其行为作保证。
+
+B-2) tlm_shogi（车万女仆：将棋附属，可选，仅 NeoForge 1.21.1）
+   Source:  https://github.com/sangeeeee/TouhouLittleMaid-Shogi
+   License: MIT（jar 内 mods.toml 的 license 字段原文）
+   说明:    本 mod 通过反射调用其公开 API（BlockJChess.maidMove、TileEntityJChess 的
+            getChessData/isPlayerTurn 等），并**复用其自带引擎**：
+            用反射 new 一个独立的 SunfishEngine 实例对 SFEN 局面算招（不触碰它模组的
+            单例，也不修改其任何状态）。同样不打包它的任何字节。
+
+B-3) Sunfish4（tlm_shogi 内嵌的将棋引擎，MIT）
+   Source:  https://github.com/sunfish-shogi/sunfish4
+   License: MIT — Copyright (c) 2015 Ryosuke Kubo
+   说明:    Sunfish4 由 tlm_shogi 打包在其 jar 内（assets/tlm_shogi/sunfish/eval.bin
+            与 book.bin）。本 mod **不直接分发** Sunfish4，只通过 tlm_shogi 的
+            SunfishEngine 类间接使用。其 MIT 许可全文见 tlm_shogi.jar 内的
+            META-INF/LICENSE_sunfish.txt。
+            上游说明：tlm_shogi 的描述为 "embedded pure-Java Sunfish engine"。
+
+B-4) TouhouGO（车万女仆：围棋棋盘，可选，仅 NeoForge 1.21.1）
+   Source:  https://github.com/moyinsky/TouhouGO
+            modid 由 AutoForge 生成，形如 touhou_go_board_1790384435
+   License: **上游声明不一致**：
+            仓库 LICENSE 文件为 CC0 1.0 Universal（公共领域奉献），
+            但 README 首行声明"代码及美术素材均采用 CC BY-NC-SA 4.0"。
             下文按**更严格的 README 口径**说明。
-  本 mod 的关系: 不含它的任何字节（class / 资源 / 结构文件），只在运行时用反射读取棋盘
-            方块实体，并以它自己的网络包类型发送数据（举报一手）以完成代打。
-  合规结论（两种口径下都成立）:
+   本 mod 的关系: 不含它的任何字节（class / 资源 / 结构文件），只在运行时用反射读取
+            棋盘方块实体，并以它自己的网络包类型发送数据（举报一手）以完成代打。
+   合规结论（两种口径下都成立）:
             a) 按 README 的 CC BY-NC-SA 4.0：本 mod 未复制、未改编其作品，因此不触发其
                "署名"与"相同方式共享"义务；其"非商业(NC)"限制约束的是**对其作品的利用**，
                本 mod 并未利用其作品，故不会传染到本 mod 的 GPL-3.0 分发。
@@ -107,6 +159,50 @@ GNU GPL v3 完整文本：https://www.gnu.org/licenses/gpl-3.0.txt
                商业限制；其素材源自《车万女仆》本体，遵循 TLM 的原始许可）。
             d) 上游两处声明不一致，若需商用或二次分发其内容，请联系其作者 moyin_sky 澄清。
 
-- tlm_shogi（车万女仆：将棋附属）/ ChessPVP（车万女仆：棋圣）
-  仅在安装后通过反射调用其公开 API（或复用其自带引擎）参与对局，同样不分发其代码与素材；
-  使用相应功能时请遵守各自的上游许可。
+B-5) ChessPVP / 棋圣（车万女仆 PVP 附属，可选，NeoForge + Forge）
+   Source:  发布页 https://modrinth.com/mod/tlmcp-chesspvp
+   License: **All Rights Reserved**（jar 内 mods.toml 的 license 字段原文）
+   说明:    本 mod 通过反射读取它写在方块实体 NBT 里的 PVP 状态
+            （ChessPvpP1 / ChessPvpP2 / ChessPvpTurn），以判断「本客户端是哪一方、
+            现在轮到谁」。不调用它的任何方法，不分发它的任何字节。
+   ⚠ 注意:  其许可为 All Rights Reserved，因此：
+            a) 本 mod 的 PVP 联动功能要求玩家**自行安装** ChessPVP；
+            b) 不得把 ChessPVP 的文件打进任何再分发包；
+            c) 该功能仅为运行时互操作，不构成对其作品的复制或改编。
+            如需商用相关联动，请联系其作者。
+
+B-6) ForgeConfigAPIPort（仅 Fabric 1.20.1 版，编译依赖）
+   Source:  https://github.com/FabricMC/ForgeConfigAPIPort
+   License: **MPL-2.0**（jar 内 fabric.mod.json 的 license 字段原文）
+   说明:    Fabric 版用它提供 Forge 风格的配置 API。本 mod **不内嵌**它，玩家需
+            自行安装（fabric.mod.json 中声明为 depends）。
+            MPL-2.0 与 GPL-3.0 兼容（MPL 允许与更大作品以其他许可组合，仅要求
+            其自身文件保持 MPL）。
+   另注:    Fabric 版另有可选的 ModMenu 支持（ModMenuIntegration），
+            ModMenu 许可为 MIT（https://github.com/TerraformersMC/ModMenu）。
+
+
+================================================================================
+C. GPL 合规说明（对应源码获取方式）
+================================================================================
+
+上述 A 组引擎均为 GNU GPL-3.0（GNU Go 为 GPL-3.0-or-later，按 GPLv3 的
+"or any later version" 选项以 v3 链接进整体），本 mod 本体同样以 GPL-3.0-only
+发布（见 jar 内 LICENSE），因此链接后整体仍为 GPL-3.0，许可兼容。
+
+GPL 要求分发二进制时提供**对应源码**。本 mod 的做法：
+
+  - 引擎源码不打进 jar（体积原因），而是在 CI 构建时从上游仓库按**固定版本**拉取：
+      * Stockfish: tag sf_17.1
+      * Pikafish:  commit b562d6aeac5401879e973dc53ddb56053f07bb6a
+      * Rapfi:     tag 250615
+      * GNU Go:    gnugo-3.8.tar.gz（sha256 见 A-4）
+  - 每个发布版本的构建产物内附带 engines/<platform>/BUILD_INFO.txt，记录四个引擎的
+    仓库地址、精确 commit/tar sha256 与权重 sha256；
+  - 本 mod 自身的修改（JNI 桥接层 native/src/*.cpp 与 native/CMakeLists.txt）
+    **随仓库与发布 tag 一同分发**；
+  - 构建脚本 .github/scripts/build_native.sh 完整公开了源码所打的全部补丁，
+    据此可复现出与本 mod 完全一致的引擎二进制。
+
+GNU GPL v3 完整文本：https://www.gnu.org/licenses/gpl-3.0.txt
+GNU LGPL v3 完整文本：https://www.gnu.org/licenses/lgpl-3.0.txt
