@@ -140,7 +140,7 @@ def engineRoot = file('src/main/resources/engines')
 
 // 主 jar 直接带上全部平台引擎，不再切分
 tasks.named('jar', Jar).configure {
-    archiveFileName = "Chuying.Proxy.Play${mod_version}-NeoForge-${minecraft_version}-universal.jar"
+    archiveFileName = "Chuying.Proxy.Play${mod_version}-NeoForge-${minecraft_version}.jar"
     // 开发用的中间产物不进发布包
     exclude 'engines/**/BUILD_INFO.txt.devmode'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
