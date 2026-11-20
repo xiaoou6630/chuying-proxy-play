@@ -48,3 +48,6 @@ src/main/resources/engines/
 
 ### 构建日志 ###
 *.log
+
+# 本地引擎备份/测试产物（体积大，不入库）
+engines_dev/
